@@ -13,6 +13,9 @@ let treeData = {
     parent: null
 };
 let currentNode = treeData;
+const STORAGE_KEY = 'chessTreeExplorerData';
+let pendingPromotion = null;
+let zoom = null;
 
 // Paramètres D3
 const margin = { top: 50, right: 150, bottom: 50, left: 150 };
@@ -118,21 +121,86 @@ function updateVisualTree() {
     }, 50);
 
     nodes.exit().remove();
+    saveTree();
 }
 
-// --- LOGIQUE DE JEU & NAVIGATION ---
-
-function jumpToPosition(node) {
-    currentNode = node;
-    game.load(node.fen);
-    board.position(node.fen);
-    updateVisualTree();
+function setParents(node, parent = null) {
+    node.parent = parent;
+    node.children.forEach(child => setParents(child, node));
 }
 
-function onDrop(source, target) {
-    const move = game.move({ from: source, to: target, promotion: 'q' });
-    if (!move) return 'snapback';
+function findNodeById(node, id) {
+    if (node.id === id) return node;
+    for (const child of node.children) {
+        const result = findNodeById(child, id);
+        if (result) return result;
+    }
+    return null;
+}
 
+function saveTree() {
+    try {
+        const copy = JSON.parse(JSON.stringify(treeData));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            treeData: copy,
+            currentNodeId: currentNode.id,
+            nextNodeId
+        }));
+    } catch (err) {
+        console.warn('Impossible de sauvegarder l\'arbre :', err);
+    }
+}
+
+function loadTree() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    try {
+        const data = JSON.parse(raw);
+        treeData = data.treeData;
+        setParents(treeData, null);
+        nextNodeId = data.nextNodeId || 1;
+        currentNode = findNodeById(treeData, data.currentNodeId) || treeData;
+        return true;
+    } catch (err) {
+        console.warn('Impossible de charger l\'arbre :', err);
+        return false;
+    }
+}
+
+function clearTreeLocalStorage() {
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+}
+
+function getDeepestLeaf(node) {
+    let current = node;
+    while (current.children.length > 0) {
+        current = current.children[0];
+    }
+    return current;
+}
+
+function centerOnCurrentNode() {
+    if (!svg || !zoom || !currentNode) return;
+
+    const root = d3.hierarchy(treeData);
+    treeLayout(root);
+    const nodeDatum = root.descendants().find(d => d.data.id === currentNode.id);
+    if (!nodeDatum) return;
+
+    const container = document.getElementById('tree-container');
+    if (!container) return;
+
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const targetScale = 1.2;
+    const x = width / 2 - nodeDatum.y * targetScale;
+    const y = height / 2 - nodeDatum.x * targetScale;
+
+    svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(targetScale));
+}
+
+function addMoveNode(move) {
     const existing = currentNode.children.find(c => c.name === move.san);
     if (!existing) {
         const newNode = {
@@ -147,8 +215,73 @@ function onDrop(source, target) {
     } else {
         currentNode = existing;
     }
-    
     updateVisualTree();
+}
+
+function showPromotionModal(source, target) {
+    pendingPromotion = { source, target };
+    $('#promotion-modal').show();
+}
+
+function hidePromotionModal() {
+    $('#promotion-modal').hide();
+    pendingPromotion = null;
+}
+
+function choosePromotion(piece) {
+    if (!pendingPromotion) return;
+    const { source, target } = pendingPromotion;
+    const move = game.move({ from: source, to: target, promotion: piece });
+    if (move) {
+        addMoveNode(move);
+        board.position(game.fen());
+        updateVisualTree();
+    }
+    hidePromotionModal();
+}
+
+// --- LOGIQUE DE JEU & NAVIGATION ---
+
+function jumpToPosition(node) {
+    currentNode = node;
+    game.load(node.fen);
+    board.position(node.fen);
+    updateVisualTree();
+    saveTree();
+}
+
+function onDrop(source, target) {
+    const piece = game.get(source);
+    if (piece && piece.type === 'p' && (target[1] === '8' || target[1] === '1')) {
+        showPromotionModal(source, target);
+        return 'snapback';
+    }
+
+    const move = game.move({ from: source, to: target, promotion: 'q' });
+    if (!move) return 'snapback';
+    addMoveNode(move);
+}
+
+function deleteCurrentBranch() {
+    if (currentNode === treeData) return;
+    const parent = currentNode.parent;
+    if (!parent) return;
+    parent.children = parent.children.filter(child => child.id !== currentNode.id);
+    currentNode = parent;
+    game.load(currentNode.fen);
+    board.position(currentNode.fen);
+    updateVisualTree();
+}
+
+function goToRoot() {
+    jumpToPosition(treeData);
+    centerOnCurrentNode();
+}
+
+function goToEnd() {
+    const endNode = getDeepestLeaf(currentNode);
+    jumpToPosition(endNode);
+    centerOnCurrentNode();
 }
 
 // --- INITIALISATION ---
@@ -156,31 +289,71 @@ function onDrop(source, target) {
 $(document).ready(async function() {
     await preloadPieces();
 
+    if (!loadTree()) {
+        treeData = { id: 0, name: "START", fen: game.fen(), children: [], parent: null };
+        currentNode = treeData;
+        nextNodeId = 1;
+    }
+
     // 1. Initialiser Chessboard.js
     board = ChessBoard('board', {
         draggable: true,
-        position: 'start',
+        position: currentNode.fen,
         onDrop: onDrop,
         onSnapEnd: () => board.position(game.fen()),
         pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
     });
 
     // 2. Initialiser D3.js
+    zoom = d3.zoom().scaleExtent([0.1, 2]).on("zoom", (e) => g.attr("transform", e.transform));
     svg = d3.select("#tree-container").append("svg")
         .attr("width", "100%")
         .attr("height", "100%")
-        .call(d3.zoom().on("zoom", (e) => g.attr("transform", e.transform)));
+        .call(zoom);
 
     g = svg.append("g").attr("transform", `translate(${margin.left}, ${window.innerHeight / 2})`);
     treeLayout = d3.tree().nodeSize([280, 450]);
 
     // 3. Évènements
-    $('#reset-btn').click(() => location.reload());
+    $('#reset-btn').click(() => {
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+    });
+    $('#center-btn').click(centerOnCurrentNode);
+    $('#root-btn').click(goToRoot);
+    $('#end-btn').click(goToEnd);
+    $('#delete-btn').click(deleteCurrentBranch);
+    $('#clear-storage-btn').click(clearTreeLocalStorage);
+    $('#promotion-modal .promo-buttons button').click(function() {
+        choosePromotion($(this).data('piece'));
+    });
+    $('#promo-cancel').click(hidePromotionModal);
 
     $(document).keydown(e => {
-        if (e.which === 37 && currentNode.parent) jumpToPosition(currentNode.parent); 
-        if (e.which === 39 && currentNode.children.length > 0) jumpToPosition(currentNode.children[0]); 
+        if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+        if (e.key === 'ArrowLeft' && currentNode.parent) {
+            jumpToPosition(currentNode.parent);
+        }
+        if (e.key === 'ArrowRight' && currentNode.children.length > 0) {
+            jumpToPosition(currentNode.children[0]);
+        }
+        if (e.key.toLowerCase() === 'r') {
+            centerOnCurrentNode();
+        }
+        if (e.key.toLowerCase() === 'h') {
+            goToRoot();
+        }
+        if (e.key.toLowerCase() === 'e') {
+            goToEnd();
+        }
+        if (e.key.toLowerCase() === 'd') {
+            deleteCurrentBranch();
+        }
+        if (e.key.toLowerCase() === 'l') {
+            clearTreeLocalStorage();
+        }
     });
 
     updateVisualTree();
+    saveTree();
 });

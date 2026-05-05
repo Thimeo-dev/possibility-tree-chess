@@ -23,18 +23,42 @@
             <div id="opening-name">Position de départ</div>
             <div class="hints">
                 <p>⌨️ <span>Flèches</span> pour naviguer</p>
+                <p>⌨️ <span>R</span> pour recentrer</p>
+                <p>⌨️ <span>H</span> pour début de l'arbre</p>
+                <p>⌨️ <span>E</span> pour fin de l'arbre</p>
+                <p>⌨️ <span>D</span> pour supprimer branche</p>
+                <p>⌨️ <span>L</span> pour vider le stockage local</p>
                 <p>🖱️ <span>Cliquez</span> sur l'arbre pour voyager</p>
             </div>
         </div>
 
         <div class="actions">
             <button id="reset-btn">Réinitialiser l'Arbre</button>
+            <button id="center-btn">Recentrer l'arbre</button>
+            <button id="root-btn">Début de l'arbre</button>
+            <button id="end-btn">Fin de l'arbre</button>
+            <button id="delete-btn">Supprimer branche</button>
+            <button id="clear-storage-btn">Vider le stockage</button>
         </div>
     </aside>
     
     <main id="tree-container">
         <!-- L'arbre nodal D3.js sera généré ici -->
     </main>
+</div>
+
+<div id="promotion-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+        <h2>Promotion du pion</h2>
+        <p>Choisissez la pièce de promotion :</p>
+        <div class="promo-buttons">
+            <button data-piece="q">Dame</button>
+            <button data-piece="r">Tour</button>
+            <button data-piece="b">Fou</button>
+            <button data-piece="n">Cavalier</button>
+        </div>
+        <button id="promo-cancel" class="secondary-button">Annuler</button>
+    </div>
 </div>
 
 <!-- Scripts (Ordre impératif) -->

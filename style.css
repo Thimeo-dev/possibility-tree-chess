@@ -106,6 +106,85 @@ h1 {
     filter: brightness(1.2);
 }
 
+.actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.actions button {
+    width: 100%;
+    padding: 12px;
+    font-weight: bold;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s, filter 0.2s;
+}
+
+.actions button:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+}
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.modal-card {
+    background: #1e1e1e;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 30px;
+    width: min(420px, 90vw);
+    text-align: center;
+    box-shadow: 0 20px 80px rgba(0,0,0,0.45);
+}
+
+.modal-card h2 {
+    margin: 0 0 12px;
+    color: var(--accent);
+}
+
+.modal-card p {
+    margin: 0 0 18px;
+    color: var(--text-dim);
+}
+
+.promo-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.promo-buttons button,
+.secondary-button {
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 0;
+    cursor: pointer;
+    transition: filter 0.2s;
+}
+
+.promo-buttons button:hover,
+.secondary-button:hover {
+    filter: brightness(1.15);
+}
+
+.secondary-button {
+    background: #2c3e50;
+    width: 100%;
+}
+
 /* Arbre Nodal */
 #tree-container {
     flex-grow: 1;
