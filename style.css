@@ -115,6 +115,12 @@ h1 {
     background-size: 40px 40px;
     z-index: 1; /* Reste sous le panneau de gauche */
     position: relative;
+    overflow: visible;
+}
+
+#tree-container svg,
+#tree-container foreignObject {
+    overflow: visible;
 }
 
 .node canvas {
