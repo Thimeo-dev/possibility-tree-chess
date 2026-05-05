@@ -1,0 +1,135 @@
+:root {
+    --bg-dark: #121212;
+    --panel-bg: #1e1e1e;
+    --accent: #3498db;
+    --text-main: #ffffff;
+    --text-dim: #a0a0a0;
+    --border: #333333;
+}
+
+body {
+    margin: 0;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+}
+
+#main-container {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Panneau de gauche */
+#left-panel {
+    width: 420px;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+    z-index: 10;
+    /* On laisse sortir les pièces du panneau */
+    overflow: visible !important; 
+}
+
+h1 {
+    margin: 0 0 20px 0;
+    font-size: 1.5rem;
+    color: var(--accent);
+}
+
+#board {
+    width: 100%;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    /* IMPORTANT : static empêche de créer un nouveau contexte d'empilement 
+       qui emprisonnerait la pièce sous l'arbre nodal */
+    position: static !important; 
+    overflow: visible !important;
+}
+
+/* LA PIÈCE QUI VOLE : Classe interne de chessboard.js */
+.chessboard-63f37 {
+    z-index: 9999 !important;
+}
+
+/* Assure que la pièce en cours de drag est au-dessus de tout */
+.piece-417db {
+    z-index: 100000 !important;
+}
+
+.status-card {
+    background: #252525;
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid var(--accent);
+}
+
+#opening-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+}
+
+.hints p {
+    margin: 5px 0;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.hints span {
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.actions {
+    margin-top: auto;
+}
+
+#reset-btn {
+    width: 100%;
+    padding: 12px;
+    background: #e74c3c;
+    border: none;
+    color: white;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: filter 0.2s;
+}
+
+#reset-btn:hover {
+    filter: brightness(1.2);
+}
+
+/* Arbre Nodal */
+#tree-container {
+    flex-grow: 1;
+    cursor: grab;
+    background-image: 
+        radial-gradient(circle at 2px 2px, #222 1px, transparent 0);
+    background-size: 40px 40px;
+    z-index: 1; /* Reste sous le panneau de gauche */
+    position: relative;
+}
+
+.node canvas {
+    box-shadow: 0 0 15px rgba(0,0,0,0.6);
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #000;
+}
+
+.node:hover canvas {
+    transform: scale(1.05);
+}
+
+.link {
+    fill: none;
+    stroke: #444;
+    stroke-width: 3px;
+    opacity: 0.6;
+}

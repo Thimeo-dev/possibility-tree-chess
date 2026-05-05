@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Explorer Pro</title>
+    <!-- CSS de Chessboard.js -->
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="main-container">
+    <aside id="left-panel">
+        <header>
+            <h1>Chess Explorer</h1>
+        </header>
+        
+        <!-- Échiquier principal -->
+        <div id="board"></div>
+        
+        <div class="status-card">
+            <div id="opening-name">Position de départ</div>
+            <div class="hints">
+                <p>⌨️ <span>Flèches</span> pour naviguer</p>
+                <p>🖱️ <span>Cliquez</span> sur l'arbre pour voyager</p>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button id="reset-btn">Réinitialiser l'Arbre</button>
+        </div>
+    </aside>
+    
+    <main id="tree-container">
+        <!-- L'arbre nodal D3.js sera généré ici -->
+    </main>
+</div>
+
+<!-- Scripts (Ordre impératif) -->
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
