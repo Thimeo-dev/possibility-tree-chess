@@ -13,13 +13,17 @@ body {
     background: var(--bg-dark);
     color: var(--text-main);
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    overflow: hidden;
+    /* Allow vertical scrolling and enable smooth touch scrolling on iOS */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 #main-container {
     display: flex;
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    /* Let the page scroll when content is taller than viewport */
+    height: auto;
+    overflow: visible;
 }
 
 /* Panneau de gauche */
@@ -249,6 +253,29 @@ h1 {
     z-index: 1; /* Reste sous le panneau de gauche */
     position: relative;
     overflow: visible;
+}
+
+/* Responsive: stack panels on narrow screens for better mobile UX */
+@media (max-width: 900px) {
+    #main-container {
+        flex-direction: column;
+    }
+    #left-panel {
+        width: 100%;
+        box-shadow: none;
+        border-right: none;
+        padding-bottom: 10px;
+    }
+    #tree-container {
+        order: 2;
+        width: 100%;
+        min-height: 50vh;
+    }
+    /* Make action buttons slightly smaller on phones */
+    .actions button {
+        padding: 10px;
+        font-size: 0.95rem;
+    }
 }
 
 #tree-container svg,
