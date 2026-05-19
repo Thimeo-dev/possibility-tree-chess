@@ -1,3 +1,23 @@
+const firebaseConfig = {
+    apiKey: "AIzaSyAOY2OVSlwGY3OmJk0nKxegqgSosOFkNCY",
+
+  authDomain: "treechess-6b8fd.firebaseapp.com",
+
+  projectId: "treechess-6b8fd",
+
+  storageBucket: "treechess-6b8fd.firebasestorage.app",
+
+  messagingSenderId: "884410017970",
+
+  appId: "1:884410017970:web:ead71b37e856ac676b01ab",
+
+  measurementId: "G-WPXXLMJ2B8"
+
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
 // --- CONFIGURATION INITIALE ---
 const game = new Chess();
 let board = null;
@@ -13,15 +33,30 @@ let treeData = {
     parent: null
 };
 let currentNode = treeData;
-const STORAGE_KEY = 'chessTreeExplorerData';
 let pendingPromotion = null;
 let zoom = null;
+let currentUser = null; //  Pour suivre l'utilisateur connecté
+let isSignUpMode = false; //  Pour basculer entre Connexion et Inscription = {};
 
 // Paramètres D3
 const margin = { top: 50, right: 150, bottom: 50, left: 150 };
 let svg, g, treeLayout;
 
 // --- MOTEUR DE RENDU ---
+
+// Global error handler to show runtime errors in the UI and console
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error('Unhandled error:', message, 'at', source + ':' + lineno + ':' + colno, error);
+    try {
+        const info = document.getElementById('user-info');
+        if (info) {
+            info.style.display = 'block';
+            info.textContent = 'Erreur JS: ' + message + ' (voir console)';
+        }
+    } catch (e) {
+        // ignore
+    }
+};
 
 async function preloadPieces() {
     const pieces = [];
@@ -72,6 +107,7 @@ function renderMiniBoard(canvasId, fen) {
 }
 
 function updateVisualTree() {
+    console.log('updateVisualTree called - treeData id:', treeData && treeData.id);
     const root = d3.hierarchy(treeData);
     treeLayout(root);
 
@@ -107,7 +143,6 @@ function updateVisualTree() {
                 <div style="color:white; font-weight:bold; margin-top:8px; font-size:16px; font-family: sans-serif;">${d.data.name}</div>
             </div>
         `);
-
     const nodeUpdate = nodeEnter.merge(nodes);
     nodeUpdate.transition().duration(400).attr("transform", d => `translate(${d.y},${d.x})`);
 
@@ -121,7 +156,6 @@ function updateVisualTree() {
     }, 50);
 
     nodes.exit().remove();
-    saveTree();
 }
 
 function setParents(node, parent = null) {
@@ -138,38 +172,47 @@ function findNodeById(node, id) {
     return null;
 }
 
-function saveTree() {
-    try {
-        const copy = JSON.parse(JSON.stringify(treeData));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            treeData: copy,
-            currentNodeId: currentNode.id,
-            nextNodeId
-        }));
-    } catch (err) {
-        console.warn('Impossible de sauvegarder l\'arbre :', err);
-    }
+function serializeTree(node) {
+    return {
+        id: node.id,
+        name: node.name,
+        fen: node.fen,
+        children: node.children.map(child => serializeTree(child))
+    };
 }
 
-function loadTree() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    try {
-        const data = JSON.parse(raw);
-        treeData = data.treeData;
-        setParents(treeData, null);
-        nextNodeId = data.nextNodeId || 1;
-        currentNode = findNodeById(treeData, data.currentNodeId) || treeData;
-        return true;
-    } catch (err) {
-        console.warn('Impossible de charger l\'arbre :', err);
-        return false;
+function deserializeTree(node, parentNode = null) {
+    let restoredNode = {
+        id: node.id,
+        name: node.name,
+        fen: node.fen,
+        children: [],
+        parent: parentNode
+    };
+    if (node.children) {
+        restoredNode.children = node.children.map(child => deserializeTree(child, restoredNode));
     }
+    return restoredNode;
 }
 
-function clearTreeLocalStorage() {
-    localStorage.removeItem(STORAGE_KEY);
-    location.reload();
+function triggerAutoSave() {
+    if (!currentUser) return;
+    const cleanedTree = serializeTree(treeData);
+    db.ref('users/' + currentUser.uid + '/chessTree').set({
+        tree: cleanedTree,
+        currentId: currentNode.id,
+        nextNodeId: nextNodeId
+    });
+}
+
+function resetTreeToDefault() {
+    treeData = { id: 0, name: "START", fen: game.fen(), children: [], parent: null };
+    currentNode = treeData;
+    nextNodeId = 1;
+    game.load(treeData.fen);
+    if (board) board.position(treeData.fen);
+    updateVisualTree();
+    triggerAutoSave();
 }
 
 function getDeepestLeaf(node) {
@@ -216,6 +259,7 @@ function addMoveNode(move) {
         currentNode = existing;
     }
     updateVisualTree();
+    triggerAutoSave();
 }
 
 function showPromotionModal(source, target) {
@@ -247,7 +291,8 @@ function jumpToPosition(node) {
     game.load(node.fen);
     board.position(node.fen);
     updateVisualTree();
-    saveTree();
+    triggerAutoSave();
+    triggerAutoSave();
 }
 
 function onDrop(source, target) {
@@ -271,6 +316,7 @@ function deleteCurrentBranch() {
     game.load(currentNode.fen);
     board.position(currentNode.fen);
     updateVisualTree();
+    triggerAutoSave();
 }
 
 function goToRoot() {
@@ -287,13 +333,9 @@ function goToEnd() {
 // --- INITIALISATION ---
 
 $(document).ready(async function() {
+    console.log('document.ready start');
     await preloadPieces();
-
-    if (!loadTree()) {
-        treeData = { id: 0, name: "START", fen: game.fen(), children: [], parent: null };
-        currentNode = treeData;
-        nextNodeId = 1;
-    }
+    console.log('pieces preloaded');
 
     // 1. Initialiser Chessboard.js
     board = ChessBoard('board', {
@@ -303,6 +345,7 @@ $(document).ready(async function() {
         onSnapEnd: () => board.position(game.fen()),
         pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
     });
+    console.log('chessboard initialized');
 
     // 2. Initialiser D3.js
     zoom = d3.zoom().scaleExtent([0.1, 2]).on("zoom", (e) => g.attr("transform", e.transform));
@@ -313,21 +356,68 @@ $(document).ready(async function() {
 
     g = svg.append("g").attr("transform", `translate(${margin.left}, ${window.innerHeight / 2})`);
     treeLayout = d3.tree().nodeSize([280, 450]);
+    console.log('d3 initialized, svg/g/treeLayout ready');
 
     // 3. Évènements
-    $('#reset-btn').click(() => {
-        localStorage.removeItem(STORAGE_KEY);
-        location.reload();
-    });
+    $('#reset-btn').click(resetTreeToDefault);
     $('#center-btn').click(centerOnCurrentNode);
     $('#root-btn').click(goToRoot);
     $('#end-btn').click(goToEnd);
     $('#delete-btn').click(deleteCurrentBranch);
-    $('#clear-storage-btn').click(clearTreeLocalStorage);
     $('#promotion-modal .promo-buttons button').click(function() {
         choosePromotion($(this).data('piece'));
     });
     $('#promo-cancel').click(hidePromotionModal);
+
+    // Ouverture / Fermeture modale
+    const authModal = $('#auth-modal');
+    $(document).on('click', '#auth-btn', function(e) {
+        e.preventDefault();
+        if (currentUser) { auth.signOut(); } else { authModal.css('display', 'flex'); }
+    });
+    $(document).on('click', '.close-modal', function() { authModal.hide(); });
+
+    $('#toggle-auth-mode').click(function() {
+        isSignUpMode = !isSignUpMode;
+        $('#modal-title').text(isSignUpMode ? 'Inscription' : 'Connexion');
+        $('#submit-auth-btn').text(isSignUpMode ? 'S\'inscrire' : 'Se connecter');
+        $('#toggle-auth-mode span').text(isSignUpMode ? 'Connectez-vous ici' : 'Créez-en un ici');
+    });
+
+    $('#auth-form').submit(function(e) {
+        e.preventDefault();
+        const email = $('#auth-email').val();
+        const password = $('#auth-password').val();
+        if (isSignUpMode) {
+            auth.createUserWithEmailAndPassword(email, password).then(() => authModal.hide()).catch(err => alert(err.message));
+        } else {
+            auth.signInWithEmailAndPassword(email, password).then(() => authModal.hide()).catch(err => alert(err.message));
+        }
+    });
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            $('#user-info').text(user.email).show();
+            $('#auth-btn').text("Déconnexion").removeClass("btn-primary").addClass("btn-danger");
+            db.ref('users/' + user.uid + '/chessTree').once('value').then(snapshot => {
+                const data = snapshot.val();
+                if (data && data.tree) {
+                    treeData = deserializeTree(data.tree);
+                    nextNodeId = data.nextNodeId || 1;
+                    currentNode = findNodeById(treeData, data.currentId) || treeData;
+                    game.load(currentNode.fen);
+                    board.position(currentNode.fen);
+                }
+                updateVisualTree();
+            });
+        } else {
+            currentUser = null;
+            $('#user-info').hide();
+            $('#auth-btn').text("Connexion / Inscription").removeClass("btn-danger").addClass("btn-primary");
+            resetTreeToDefault();
+        }
+    });
 
     $(document).keydown(e => {
         if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
@@ -349,11 +439,7 @@ $(document).ready(async function() {
         if (e.key.toLowerCase() === 'd') {
             deleteCurrentBranch();
         }
-        if (e.key.toLowerCase() === 'l') {
-            clearTreeLocalStorage();
-        }
     });
 
     updateVisualTree();
-    saveTree();
 });
