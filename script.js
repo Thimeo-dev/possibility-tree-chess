@@ -77,33 +77,19 @@ function renderMiniBoard(canvasId, fen) {
     const size = 200;
     const ratio = window.devicePixelRatio || 1;
 
-    // Ensure CSS size (user space) remains fixed
     canvas.style.width = size + 'px';
     canvas.style.height = size + 'px';
-
-    // Set actual buffer size for high-DPI displays
     canvas.width = Math.round(size * ratio);
     canvas.height = Math.round(size * ratio);
 
-    // Reset any previous transform and scale to devicePixelRatio
     if (typeof ctx.setTransform === 'function') {
-        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    } else if (typeof ctx.resetTransform === 'function') {
-        ctx.resetTransform();
-        ctx.scale(ratio, ratio);
-    } else {
-        // Fallback (older browsers): try to reset by clearing and scaling once
-        try { ctx.setTransform(1,0,0,1,0,0); } catch (e) {}
-        ctx.scale(ratio, ratio);
+        try { ctx.setTransform(1, 0, 0, 1, 0, 0); } catch (e) {}
     }
-
-    // Clear drawing area (in user space coordinates)
-    ctx.clearRect(0, 0, size, size);
     ctx.imageSmoothingEnabled = true;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const sq = size / 8;
+    const sq = canvas.width / 8;
 
-    // Dessin des cases
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
             ctx.fillStyle = (r + c) % 2 === 0 ? '#f0d9b5' : '#b58863';
@@ -111,20 +97,20 @@ function renderMiniBoard(canvasId, fen) {
         }
     }
 
-    // Dessin des pièces
     const rows = fen.split(' ')[0].split('/');
     rows.forEach((row, r) => {
         let c = 0;
         for (let char of row) {
-            if (!isNaN(char)) c += parseInt(char);
-            else {
+            if (!isNaN(char)) {
+                c += parseInt(char, 10);
+            } else {
                 const key = (char === char.toUpperCase() ? 'w' : 'b') + char.toUpperCase();
                 const img = pieceCache[key];
                 if (img) {
                     try {
                         ctx.drawImage(img, c * sq, r * sq, sq, sq);
                     } catch (e) {
-                        // If drawing fails, skip — keep app stable
+                        // ignore drawing errors
                     }
                 }
                 c++;
