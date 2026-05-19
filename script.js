@@ -74,14 +74,34 @@ function renderMiniBoard(canvasId, fen) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const size = 200; 
-    const ratio = window.devicePixelRatio || 2;
-    
-    canvas.width = size * ratio;
-    canvas.height = size * ratio;
-    ctx.scale(ratio, ratio);
+    const size = 200;
+    const ratio = window.devicePixelRatio || 1;
 
-    const sq = 25; 
+    // Ensure CSS size (user space) remains fixed
+    canvas.style.width = size + 'px';
+    canvas.style.height = size + 'px';
+
+    // Set actual buffer size for high-DPI displays
+    canvas.width = Math.round(size * ratio);
+    canvas.height = Math.round(size * ratio);
+
+    // Reset any previous transform and scale to devicePixelRatio
+    if (typeof ctx.setTransform === 'function') {
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    } else if (typeof ctx.resetTransform === 'function') {
+        ctx.resetTransform();
+        ctx.scale(ratio, ratio);
+    } else {
+        // Fallback (older browsers): try to reset by clearing and scaling once
+        try { ctx.setTransform(1,0,0,1,0,0); } catch (e) {}
+        ctx.scale(ratio, ratio);
+    }
+
+    // Clear drawing area (in user space coordinates)
+    ctx.clearRect(0, 0, size, size);
+    ctx.imageSmoothingEnabled = true;
+
+    const sq = size / 8;
 
     // Dessin des cases
     for (let r = 0; r < 8; r++) {
@@ -98,8 +118,15 @@ function renderMiniBoard(canvasId, fen) {
         for (let char of row) {
             if (!isNaN(char)) c += parseInt(char);
             else {
-                const img = pieceCache[(char === char.toUpperCase() ? 'w' : 'b') + char.toUpperCase()];
-                if (img) ctx.drawImage(img, c * sq, r * sq, sq, sq);
+                const key = (char === char.toUpperCase() ? 'w' : 'b') + char.toUpperCase();
+                const img = pieceCache[key];
+                if (img) {
+                    try {
+                        ctx.drawImage(img, c * sq, r * sq, sq, sq);
+                    } catch (e) {
+                        // If drawing fails, skip — keep app stable
+                    }
+                }
                 c++;
             }
         }
