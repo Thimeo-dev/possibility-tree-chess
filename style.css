@@ -2,6 +2,7 @@
     --bg-dark: #121212;
     --panel-bg: #1e1e1e;
     --accent: #3498db;
+    --danger: #e74c3c;
     --text-main: #ffffff;
     --text-dim: #a0a0a0;
     --border: #333333;
@@ -87,26 +88,6 @@ h1 {
 }
 
 .actions {
-    margin-top: auto;
-}
-
-#reset-btn {
-    width: 100%;
-    padding: 12px;
-    background: #e74c3c;
-    border: none;
-    color: white;
-    font-weight: bold;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: filter 0.2s;
-}
-
-#reset-btn:hover {
-    filter: brightness(1.2);
-}
-
-.actions {
     display: grid;
     gap: 10px;
     margin-top: 20px;
@@ -127,6 +108,78 @@ h1 {
     filter: brightness(1.05);
 }
 
+#reset-btn {
+    background: #cf4545;
+}
+
+.btn-primary {
+    background: var(--accent) !important;
+    color: white;
+}
+
+.btn-danger {
+    background: var(--danger) !important;
+    color: white;
+}
+
+/* Éléments spécifiques du formulaire de la modale de connexion */
+.form-group {
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    box-sizing: border-box;
+    background: #252525;
+    border: 1px solid var(--border);
+    color: white;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+#toggle-auth-mode {
+    margin-top: 20px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+#toggle-auth-mode span {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.close-modal {
+    position: absolute;
+    right: 20px;
+    top: 15px;
+    color: var(--text-dim);
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.close-modal:hover {
+    color: white;
+}
+
+/* Modales d'interfaces (Promotion & Authentification) */
 .modal-overlay {
     position: fixed;
     inset: 0;
@@ -145,6 +198,7 @@ h1 {
     width: min(420px, 90vw);
     text-align: center;
     box-shadow: 0 20px 80px rgba(0,0,0,0.45);
+    position: relative;
 }
 
 .modal-card h2 {
