@@ -281,6 +281,53 @@ function updateOpeningName(fen) {
     target.textContent = opening || 'Ouverture inconnue';
 }
 
+const validPieceThemes = ['wikipedia', 'alpha', 'uscf'];
+const validBoardThemes = ['classic', 'blue', 'dark', 'forest', 'wood', 'cyber'];
+
+function getPieceThemeUrl(theme) {
+    if (!validPieceThemes.includes(theme)) theme = 'wikipedia';
+    return `https://unpkg.com/chessboardjs@0.0.1/www/img/chesspieces/${theme}/{piece}.png`;
+}
+
+function applyBoardTheme(theme) {
+    const boardEl = document.getElementById('board');
+    if (!boardEl) return;
+    boardEl.classList.remove(...validBoardThemes);
+    boardEl.classList.add(theme);
+}
+
+function initializeBoard(theme, pieceTheme) {
+    if (!theme) theme = localStorage.getItem('boardTheme') || 'classic';
+    if (!pieceTheme) pieceTheme = localStorage.getItem('pieceTheme') || 'wikipedia';
+    if (!validBoardThemes.includes(theme)) theme = 'classic';
+    if (!validPieceThemes.includes(pieceTheme)) pieceTheme = 'wikipedia';
+    applyBoardTheme(theme);
+    if (board && typeof board.destroy === 'function') {
+        board.destroy();
+    }
+    board = ChessBoard('board', {
+        draggable: true,
+        position: currentNode.fen,
+        onDrop: onDrop,
+        onSnapEnd: () => board.position(game.fen()),
+        pieceTheme: getPieceThemeUrl(pieceTheme)
+    });
+    const boardSelect = document.getElementById('board-theme-select');
+    const pieceSelect = document.getElementById('piece-theme-select');
+    if (boardSelect) boardSelect.value = theme;
+    if (pieceSelect) pieceSelect.value = pieceTheme;
+}
+
+function setBoardTheme(theme) {
+    localStorage.setItem('boardTheme', theme);
+    initializeBoard(theme, localStorage.getItem('pieceTheme') || 'wikipedia');
+}
+
+function setPieceTheme(theme) {
+    localStorage.setItem('pieceTheme', theme);
+    initializeBoard(localStorage.getItem('boardTheme') || 'classic', theme);
+}
+
 function getSavedTreesLocal() {
     return JSON.parse(localStorage.getItem('savedTrees') || '{}');
 }
@@ -621,14 +668,19 @@ $(document).ready(async function() {
     });
 
     // 1. Initialiser Chessboard.js
-    board = ChessBoard('board', {
-        draggable: true,
-        position: currentNode.fen,
-        onDrop: onDrop,
-        onSnapEnd: () => board.position(game.fen()),
-        pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
-    });
+    initializeBoard();
     console.log('chessboard initialized');
+
+    // 1b. Theme selectors
+    $('#board-theme-select').change(function() {
+        setBoardTheme($(this).val());
+    });
+    $('#piece-theme-select').change(function() {
+        setPieceTheme($(this).val());
+    });
+    $('#settings-btn').click(function() {
+        $('#settings-panel').toggleClass('hidden');
+    });
 
     // 2. Initialiser D3.js
     zoom = d3.zoom().scaleExtent([0.1, 2]).on("zoom", (e) => g.attr("transform", e.transform));

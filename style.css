@@ -56,6 +56,60 @@ h1 {
     overflow: visible !important;
 }
 
+#board.classic .white-1e1d7 { background: #f0d9b5 !important; }
+#board.classic .black-3c85d { background: #b58863 !important; }
+#board.blue .white-1e1d7 { background: #dbefff !important; }
+#board.blue .black-3c85d { background: #3c6aac !important; }
+#board.dark .white-1e1d7 { background: #6f6f6f !important; }
+#board.dark .black-3c85d { background: #2f2f2f !important; }
+#board.forest .white-1e1d7 { background: #d8e8d8 !important; }
+#board.forest .black-3c85d { background: #527d53 !important; }
+#board.wood .white-1e1d7 { background: #d2b48c !important; }
+#board.wood .black-3c85d { background: #8b5a2b !important; }
+#board.cyber .white-1e1d7 { background: #a3f7ff !important; }
+#board.cyber .black-3c85d { background: #0e4d6d !important; }
+
+.settings-panel {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #444;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+}
+
+.settings-panel.hidden {
+    display: none;
+}
+
+.theme-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.theme-group label {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+}
+
+.theme-group select {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background: #1a1a1a;
+    color: white;
+}
+
+#settings-btn {
+    background: #3498db;
+}
+
+#settings-btn:hover {
+    background: #2b81b6;
+}
+
 /* LA PIÈCE QUI VOLE : Classe interne de chessboard.js */
 .chessboard-63f37 {
     z-index: 9999 !important;

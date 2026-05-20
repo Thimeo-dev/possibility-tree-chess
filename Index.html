@@ -19,6 +19,27 @@
         
         <div class="status-card">
             <div id="opening-name">Position de départ</div>
+            <div id="settings-panel" class="settings-panel hidden">
+                <div class="theme-group">
+                    <label>Style du plateau</label>
+                    <select id="board-theme-select">
+                        <option value="classic">Classique</option>
+                        <option value="blue">Bleu</option>
+                        <option value="dark">Sombre</option>
+                        <option value="forest">Forêt</option>
+                        <option value="wood">Bois</option>
+                        <option value="cyber">Cyber</option>
+                    </select>
+                </div>
+                <div class="theme-group">
+                    <label>Style des pièces</label>
+                    <select id="piece-theme-select">
+                        <option value="wikipedia">Wikipédia</option>
+                        <option value="alpha">Alpha</option>
+                        <option value="uscf">USCF</option>
+                    </select>
+                </div>
+            </div>
             <div class="hints">
                 <p>⌨️ <span>Flèches</span> pour naviguer</p>
                 <p>⌨️ <span>R</span> pour recentrer</p>
@@ -31,6 +52,7 @@
 
         <div class="actions">
             <button id="reset-btn">Réinitialiser l'Arbre</button>
+            <button id="settings-btn">Réglages</button>
             <button id="center-btn">Recentrer l'arbre</button>
             <button id="root-btn">Début de l'arbre</button>
             <button id="end-btn">Fin de l'arbre</button>
