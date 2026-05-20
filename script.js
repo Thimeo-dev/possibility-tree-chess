@@ -23,6 +23,8 @@ const game = new Chess();
 let board = null;
 let nextNodeId = 1;
 const pieceCache = {};
+let currentBoardTheme = localStorage.getItem('boardTheme') || 'classic';
+let currentPieceTheme = localStorage.getItem('pieceTheme') || 'wikipedia';
 
 // Structure de données de l'arbre
 let treeData = {
@@ -58,16 +60,31 @@ window.onerror = function(message, source, lineno, colno, error) {
     }
 };
 
-async function preloadPieces() {
+const validPieceThemes = ['wikipedia', 'alpha', 'uscf'];
+const validBoardThemes = ['classic', 'blue', 'dark', 'forest', 'wood', 'cyber'];
+
+async function preloadPieces(theme = currentPieceTheme) {
+    if (!validPieceThemes.includes(theme)) theme = 'wikipedia';
     const pieces = [];
     ['w', 'b'].forEach(c => ['P', 'N', 'B', 'R', 'Q', 'K'].forEach(t => pieces.push(c + t)));
-    
     await Promise.all(pieces.map(p => new Promise(resolve => {
         const img = new Image();
-        img.src = `https://chessboardjs.com/img/chesspieces/wikipedia/${p}.png`;
+        img.src = getPieceThemeUrl(theme).replace('{piece}', p);
+        img.crossOrigin = 'anonymous';
         img.onload = () => { pieceCache[p] = img; resolve(); };
-        img.onerror = resolve;
+        img.onerror = () => { pieceCache[p] = null; resolve(); };
     })));
+}
+
+function getBoardThemeColors(theme = currentBoardTheme) {
+    switch (theme) {
+        case 'blue': return { light: '#dbefff', dark: '#3c6aac' };
+        case 'dark': return { light: '#6f6f6f', dark: '#2f2f2f' };
+        case 'forest': return { light: '#d8e8d8', dark: '#527d53' };
+        case 'wood': return { light: '#d2b48c', dark: '#8b5a2b' };
+        case 'cyber': return { light: '#a3f7ff', dark: '#0e4d6d' };
+        default: return { light: '#f0d9b5', dark: '#b58863' };
+    }
 }
 
 function renderMiniBoard(canvasId, fen) {
@@ -89,10 +106,11 @@ function renderMiniBoard(canvasId, fen) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const sq = canvas.width / 8;
+    const { light, dark } = getBoardThemeColors(currentBoardTheme);
 
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
-            ctx.fillStyle = (r + c) % 2 === 0 ? '#f0d9b5' : '#b58863';
+            ctx.fillStyle = (r + c) % 2 === 0 ? light : dark;
             ctx.fillRect(c * sq, r * sq, sq, sq);
         }
     }
@@ -281,9 +299,6 @@ function updateOpeningName(fen) {
     target.textContent = opening || 'Ouverture inconnue';
 }
 
-const validPieceThemes = ['wikipedia', 'alpha', 'uscf'];
-const validBoardThemes = ['classic', 'blue', 'dark', 'forest', 'wood', 'cyber'];
-
 function getPieceThemeUrl(theme) {
     if (!validPieceThemes.includes(theme)) theme = 'wikipedia';
     return `https://unpkg.com/chessboardjs@0.0.1/www/img/chesspieces/${theme}/{piece}.png`;
@@ -296,12 +311,20 @@ function applyBoardTheme(theme) {
     boardEl.classList.add(theme);
 }
 
-function initializeBoard(theme, pieceTheme) {
-    if (!theme) theme = localStorage.getItem('boardTheme') || 'classic';
-    if (!pieceTheme) pieceTheme = localStorage.getItem('pieceTheme') || 'wikipedia';
+async function initializeBoard(theme, pieceTheme) {
+    theme = theme || localStorage.getItem('boardTheme') || 'classic';
+    pieceTheme = pieceTheme || localStorage.getItem('pieceTheme') || 'wikipedia';
     if (!validBoardThemes.includes(theme)) theme = 'classic';
     if (!validPieceThemes.includes(pieceTheme)) pieceTheme = 'wikipedia';
+
+    currentBoardTheme = theme;
+    currentPieceTheme = pieceTheme;
+    localStorage.setItem('boardTheme', theme);
+    localStorage.setItem('pieceTheme', pieceTheme);
+
     applyBoardTheme(theme);
+    await preloadPieces(pieceTheme);
+
     if (board && typeof board.destroy === 'function') {
         board.destroy();
     }
@@ -316,16 +339,18 @@ function initializeBoard(theme, pieceTheme) {
     const pieceSelect = document.getElementById('piece-theme-select');
     if (boardSelect) boardSelect.value = theme;
     if (pieceSelect) pieceSelect.value = pieceTheme;
+
+    updateVisualTree();
 }
 
 function setBoardTheme(theme) {
     localStorage.setItem('boardTheme', theme);
-    initializeBoard(theme, localStorage.getItem('pieceTheme') || 'wikipedia');
+    initializeBoard(theme, currentPieceTheme);
 }
 
 function setPieceTheme(theme) {
     localStorage.setItem('pieceTheme', theme);
-    initializeBoard(localStorage.getItem('boardTheme') || 'classic', theme);
+    initializeBoard(currentBoardTheme, theme);
 }
 
 function getSavedTreesLocal() {
