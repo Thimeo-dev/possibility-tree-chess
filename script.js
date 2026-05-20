@@ -16,7 +16,7 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-const db = firebase.database();
+const db = firebase.firestore();
 
 // --- CONFIGURATION INITIALE ---
 const game = new Chess();
@@ -211,11 +211,11 @@ function deserializeTree(node, parentNode = null) {
 function triggerAutoSave() {
     if (!currentUser) return;
     const cleanedTree = serializeTree(treeData);
-    db.ref('users/' + currentUser.uid + '/chessTree').set({
-        tree: cleanedTree,
+    db.collection('users').doc(currentUser.uid).set({
+        chessTree: cleanedTree,
         currentId: currentNode.id,
         nextNodeId: nextNodeId
-    });
+    }, { merge: true });
 }
 
 function getSavedTreesLocal() {
@@ -242,10 +242,11 @@ function renderSaveList() {
         saves.push({ id, storage: 'local', name: payload.name, timestamp: payload.timestamp });
     }
     if (currentUser) {
-        db.ref('users/' + currentUser.uid + '/savedTrees').once('value').then(snapshot => {
-            const firebaseSaved = snapshot.val() || {};
-            for (const [id, payload] of Object.entries(firebaseSaved)) {
-                saves.push({ id, storage: 'firebase', name: payload.name, timestamp: payload.timestamp });
+        db.collection('users').doc(currentUser.uid).get().then(doc => {
+            const payload = doc.exists ? doc.data() : null;
+            const firebaseSaved = (payload && payload.savedTrees) || {};
+            for (const [id, entry] of Object.entries(firebaseSaved)) {
+                saves.push({ id, storage: 'firebase', name: entry.name, timestamp: entry.timestamp });
             }
             renderSaveRows(container, saves);
         }).catch(err => {
@@ -276,10 +277,18 @@ function renderSaveRows(container, saves) {
                 <span>${save.storage === 'firebase' ? 'Cloud' : 'Local'} · ${new Date(save.timestamp).toLocaleString()}</span>
             </div>
             <div style="display:flex;gap:8px;">
-                <button class="btn btn-sm btn-primary load-save-btn" data-id="${save.id}" data-storage="${save.storage}">Charger</button>
-                <button class="btn btn-sm btn-danger delete-save-btn" data-id="${save.id}" data-storage="${save.storage}">Suppr</button>
+                <button class="btn btn-sm btn-primary load-save-btn">Charger</button>
+                <button class="btn btn-sm btn-danger delete-save-btn">Suppr</button>
             </div>
         `;
+        const loadButton = row.querySelector('.load-save-btn');
+        const deleteButton = row.querySelector('.delete-save-btn');
+        loadButton.dataset.id = save.id;
+        loadButton.dataset.storage = save.storage;
+        deleteButton.dataset.id = save.id;
+        deleteButton.dataset.storage = save.storage;
+        loadButton.addEventListener('click', () => loadSaved(save.id, save.storage));
+        deleteButton.addEventListener('click', () => deleteSaved(save.id, save.storage));
         container.appendChild(row);
     }
 }
@@ -317,12 +326,16 @@ function saveSnapshot(storageType = 'local') {
             setSaveStatus('Connectez-vous pour sauvegarder dans le cloud.', true);
             return;
         }
-        db.ref('users/' + currentUser.uid + '/savedTrees/' + id).set(payload).then(() => {
+        db.collection('users').doc(currentUser.uid).get().then(doc => {
+            const userData = doc.exists ? doc.data() : {};
+            const savedTrees = Object.assign({}, userData.savedTrees || {}, { [id]: payload });
+            return db.collection('users').doc(currentUser.uid).set({ savedTrees }, { merge: true });
+        }).then(() => {
             setSaveStatus('Sauvegarde cloud créée.');
             renderSaveList();
         }).catch(err => {
-            console.error(err);
-            setSaveStatus('Erreur lors de la sauvegarde cloud.', true);
+            console.error('Erreur sauvegarde cloud', err);
+            setSaveStatus(`Erreur cloud: ${err.code || err.message || err}`, true);
         });
     } else {
         const saved = getSavedTreesLocal();
@@ -340,17 +353,19 @@ function loadSaved(id, storageType = 'local') {
             setSaveStatus('Connexion requise pour charger depuis le cloud.', true);
             return;
         }
-        db.ref('users/' + currentUser.uid + '/savedTrees/' + id).once('value').then(snapshot => {
-            const payload = snapshot.val();
-            if (!payload) {
+        db.collection('users').doc(currentUser.uid).get().then(doc => {
+            const payload = doc.exists ? doc.data() : null;
+            const saves = (payload && payload.savedTrees) || {};
+            const savePayload = saves[id];
+            if (!savePayload) {
                 setSaveStatus('Sauvegarde introuvable dans le cloud.', true);
                 return;
             }
-            applyLoadedSnapshot(payload);
+            applyLoadedSnapshot(savePayload);
             setSaveStatus('Sauvegarde cloud chargée.');
         }).catch(err => {
-            console.error(err);
-            setSaveStatus('Erreur lors du chargement cloud.', true);
+            console.error('Erreur chargement cloud', err);
+            setSaveStatus(`Erreur cloud: ${err.code || err.message || err}`, true);
         });
     } else {
         const saved = getSavedTreesLocal();
@@ -371,12 +386,17 @@ function deleteSaved(id, storageType = 'local') {
             setSaveStatus('Connexion requise pour supprimer dans le cloud.', true);
             return;
         }
-        db.ref('users/' + currentUser.uid + '/savedTrees/' + id).remove().then(() => {
+        db.collection('users').doc(currentUser.uid).get().then(doc => {
+            const payload = doc.exists ? doc.data() : null;
+            const savedTrees = Object.assign({}, (payload && payload.savedTrees) || {});
+            delete savedTrees[id];
+            return db.collection('users').doc(currentUser.uid).set({ savedTrees }, { merge: true });
+        }).then(() => {
             setSaveStatus('Sauvegarde cloud supprimée.');
             renderSaveList();
         }).catch(err => {
-            console.error(err);
-            setSaveStatus('Erreur lors de la suppression cloud.', true);
+            console.error('Erreur suppression cloud', err);
+            setSaveStatus(`Erreur cloud: ${err.code || err.message || err}`, true);
         });
     } else {
         const saved = getSavedTreesLocal();
@@ -563,12 +583,6 @@ $(document).ready(async function() {
 
     $('#save-local-btn').click(() => saveSnapshot('local'));
     $('#save-firebase-btn').click(() => saveSnapshot('firebase'));
-    $('#save-list').on('click', '.load-save-btn', function() {
-        loadSaved($(this).data('id'), $(this).data('storage'));
-    });
-    $('#save-list').on('click', '.delete-save-btn', function() {
-        deleteSaved($(this).data('id'), $(this).data('storage'));
-    });
 
     // Ouverture / Fermeture modale
     const authModal = $('#auth-modal');
@@ -601,15 +615,21 @@ $(document).ready(async function() {
             currentUser = user;
             $('#user-info').text(user.email).show();
             $('#auth-btn').text("Déconnexion").removeClass("btn-primary").addClass("btn-danger");
-            db.ref('users/' + user.uid + '/chessTree').once('value').then(snapshot => {
-                const data = snapshot.val();
-                if (data && data.tree) {
-                    treeData = deserializeTree(data.tree);
+            db.collection('users').doc(user.uid).get().then(doc => {
+                const data = doc.exists ? doc.data() : null;
+                if (data && data.chessTree) {
+                    treeData = deserializeTree(data.chessTree);
                     nextNodeId = data.nextNodeId || 1;
                     currentNode = findNodeById(treeData, data.currentId) || treeData;
                     game.load(currentNode.fen);
                     board.position(currentNode.fen);
                 }
+                updateVisualTree();
+                updateSaveButtons();
+                renderSaveList();
+            }).catch(err => {
+                console.error('Erreur lecture tableau cloud', err);
+                setSaveStatus(`Erreur cloud: ${err.code || err.message || err}`, true);
                 updateVisualTree();
                 updateSaveButtons();
                 renderSaveList();
