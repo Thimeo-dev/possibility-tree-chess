@@ -1,18 +1,11 @@
 const firebaseConfig = {
     apiKey: "AIzaSyAOY2OVSlwGY3OmJk0nKxegqgSosOFkNCY",
-
-  authDomain: "treechess-6b8fd.firebaseapp.com",
-
-  projectId: "treechess-6b8fd",
-
-  storageBucket: "treechess-6b8fd.firebasestorage.app",
-
-  messagingSenderId: "884410017970",
-
-  appId: "1:884410017970:web:ead71b37e856ac676b01ab",
-
-  measurementId: "G-WPXXLMJ2B8"
-
+    authDomain: "treechess-6b8fd.firebaseapp.com",
+    projectId: "treechess-6b8fd",
+    storageBucket: "treechess-6b8fd.firebasestorage.app",
+    messagingSenderId: "884410017970",
+    appId: "1:884410017970:web:ead71b37e856ac676b01ab",
+    measurementId: "G-WPXXLMJ2B8"
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
@@ -87,8 +80,8 @@ let treeData = {
 let currentNode = treeData;
 let pendingPromotion = null;
 let zoom = null;
-let currentUser = null; //  Pour suivre l'utilisateur connecté
-let isSignUpMode = false; //  Pour basculer entre Connexion et Inscription = {};
+let currentUser = null; // Pour suivre l'utilisateur connecté
+let isSignUpMode = false; // Pour basculer entre Connexion et Inscription
 
 // Paramètres D3
 const margin = { top: 50, right: 150, bottom: 50, left: 150 };
@@ -199,8 +192,6 @@ function updateVisualTree() {
         .attr("class", "link")
         .merge(links).transition().duration(400)
         .attr("d", d => {
-            // Ajustement des points d'ancrage pour éviter l'effet coupé
-            // On réduit le décalage à 80 pour que la ligne pénètre dans le cadre du plateau
             const s = { x: d.source.y + 80, y: d.source.x };
             const t = { x: d.target.y - 80, y: d.target.x };
             return `M${s.x},${s.y}C${(s.x + t.x) / 2},${s.y} ${(s.x + t.x) / 2},${t.y} ${t.x},${t.y}`;
@@ -277,9 +268,6 @@ function deserializeTree(node, parentNode = null) {
     return restoredNode;
 }
 
-let ecoOpenings = null;
-let ecoOpeningsByPosition = null;
-
 function triggerAutoSave() {
     if (!currentUser) return;
     const cleanedTree = serializeTree(treeData);
@@ -290,65 +278,59 @@ function triggerAutoSave() {
     }, { merge: true });
 }
 
-function normalizeEcoFen(fen) {
-    const parts = fen.split(' ');
-    if (parts.length < 4) return fen;
-    const [pieces, turn, castling] = parts;
-    return `${pieces} ${turn} ${castling} -`;
-}
-
-async function loadEcoOpenings() {
-    const files = ['ecoA.json', 'ecoB.json', 'ecoC.json', 'ecoD.json', 'ecoE.json', 'eco_interpolated.json'];
-    const allOpenings = {};
-    await Promise.all(files.map(async file => {
-        const response = await fetch(file);
-        if (!response.ok) throw new Error(`Impossible de charger ${file}`);
-        const data = await response.json();
-        Object.assign(allOpenings, data);
-    }));
-    ecoOpenings = allOpenings;
-    ecoOpeningsByPosition = {};
-    for (const [key, value] of Object.entries(allOpenings)) {
-        const normalized = normalizeEcoFen(key);
-        if (!(normalized in ecoOpeningsByPosition)) {
-            ecoOpeningsByPosition[normalized] = value;
-        }
-    }
-}
-
-function getEcoEntryLabel(entry) {
-    if (!entry) return null;
-    if (entry.name) return entry.name;
-    if (entry.aliases && entry.aliases.scid) return entry.aliases.scid;
-    if (entry.moves) return entry.moves;
-    return 'Ouverture inconnue';
-}
-
-function getOpeningNameFromFen(fen) {
-    if (!ecoOpenings) return null;
-    const entry = ecoOpenings[fen] || ecoOpenings[`${fen.split(' ').slice(0, 3).join(' ')} -`];
-    if (entry) {
-        return getEcoEntryLabel(entry);
-    }
-    const normalized = normalizeEcoFen(fen);
-    const fallback = ecoOpeningsByPosition ? ecoOpeningsByPosition[normalized] : null;
-    if (fallback) {
-        return getEcoEntryLabel(fallback);
-    }
-    return null;
-}
+// --- FONCTION DE RÉCUPÉRATION DE L'OUVERTURE (ROBUSTE ET MISE EN CACHE) ---
+const openingCache = {};
+let openingFetchTimeout = null;
 
 function updateOpeningName(fen) {
     const target = document.getElementById('opening-name');
     if (!target) return;
-    if (!ecoOpenings) {
-        target.textContent = 'Chargement des ouvertures...';
+
+    if (!fen || fen.startsWith("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR")) {
+        target.textContent = "Position de départ";
         return;
     }
-    const opening = getOpeningNameFromFen(fen || game.fen());
-    target.textContent = opening || 'Ouverture inconnue';
+
+    // 1. On coupe le FEN pour ne garder que les 4 premières informations (Position, Trait, Roque, En passant).
+    // Les compteurs de coups à la fin (parties 5 et 6) causent souvent des erreurs avec l'API.
+    const parts = fen.split(' ');
+    const cleanFen = parts.slice(0, 4).join(' ');
+
+    // 2. Si on a déjà cherché cette position, on affiche le résultat instantanément
+    if (openingCache[cleanFen]) {
+        target.textContent = openingCache[cleanFen];
+        return;
+    }
+
+    // 3. Anti-spam (Debounce) : on attend 300ms. Si la fonction est rappelée entre-temps, 
+    // le timer repart à zéro. Cela évite l'Erreur HTTP 429 de Lichess.
+    clearTimeout(openingFetchTimeout);
+    openingFetchTimeout = setTimeout(() => {
+        const encodedFen = encodeURIComponent(cleanFen);
+        
+        fetch(`https://explorer.lichess.ovh/lichess?variant=standard&fen=${encodedFen}`)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if (data.opening && data.opening.name) {
+                    openingCache[cleanFen] = data.opening.name;
+                    target.textContent = data.opening.name;
+                } else {
+                    openingCache[cleanFen] = "Position personnalisée / Variante inconnue";
+                    target.textContent = openingCache[cleanFen];
+                }
+            })
+            .catch(err => {
+                console.error("Erreur Explorer Lichess :", err);
+                // Affiche le code d'erreur exact sur l'interface (ex: Erreur API (HTTP 429))
+                target.textContent = `Erreur API (${err.message})`;
+            });
+    }, 300);
 }
 
+// --- SUITE DU RENDU ET THEMES ---
 function getPieceThemeUrl(theme) {
     if (!validPieceThemes.includes(theme)) theme = 'wikipedia';
     return `https://unpkg.com/chessboardjs@0.0.1/www/img/chesspieces/${theme}/{piece}.png`;
@@ -611,7 +593,7 @@ function resetTreeToDefault() {
     if (board) board.position(startingFen);
     updateVisualTree();
     const openingLabel = document.getElementById('opening-name');
-    if (openingLabel) openingLabel.textContent = 'Nouvelle analyse';
+    if (openingLabel) openingLabel.textContent = 'Position de départ';
     triggerAutoSave();
 }
 
@@ -692,7 +674,6 @@ function jumpToPosition(node) {
     board.position(node.fen);
     updateVisualTree();
     triggerAutoSave();
-    triggerAutoSave();
 }
 
 function onDrop(source, target) {
@@ -736,11 +717,6 @@ $(document).ready(async function() {
     console.log('document.ready start');
     await preloadPieces();
     console.log('pieces preloaded');
-    await loadEcoOpenings().catch(err => {
-        console.error('Erreur chargement ECO JSON', err);
-        const target = document.getElementById('opening-name');
-        if (target) target.textContent = 'Erreur chargement ouvertures';
-    });
 
     // 1. Initialiser Chessboard.js
     initializeBoard();
