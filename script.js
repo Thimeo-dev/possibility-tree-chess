@@ -169,6 +169,7 @@ function updateVisualTree() {
     }, 50);
 
     nodes.exit().remove();
+    updateOpeningName(currentNode.fen);
 }
 
 function setParents(node, parent = null) {
@@ -208,6 +209,9 @@ function deserializeTree(node, parentNode = null) {
     return restoredNode;
 }
 
+let ecoOpenings = null;
+let ecoOpeningsByPosition = null;
+
 function triggerAutoSave() {
     if (!currentUser) return;
     const cleanedTree = serializeTree(treeData);
@@ -216,6 +220,65 @@ function triggerAutoSave() {
         currentId: currentNode.id,
         nextNodeId: nextNodeId
     }, { merge: true });
+}
+
+function normalizeEcoFen(fen) {
+    const parts = fen.split(' ');
+    if (parts.length < 4) return fen;
+    const [pieces, turn, castling] = parts;
+    return `${pieces} ${turn} ${castling} -`;
+}
+
+async function loadEcoOpenings() {
+    const files = ['ecoA.json', 'ecoB.json', 'ecoC.json', 'ecoD.json', 'ecoE.json', 'eco_interpolated.json'];
+    const allOpenings = {};
+    await Promise.all(files.map(async file => {
+        const response = await fetch(file);
+        if (!response.ok) throw new Error(`Impossible de charger ${file}`);
+        const data = await response.json();
+        Object.assign(allOpenings, data);
+    }));
+    ecoOpenings = allOpenings;
+    ecoOpeningsByPosition = {};
+    for (const [key, value] of Object.entries(allOpenings)) {
+        const normalized = normalizeEcoFen(key);
+        if (!(normalized in ecoOpeningsByPosition)) {
+            ecoOpeningsByPosition[normalized] = value;
+        }
+    }
+}
+
+function getEcoEntryLabel(entry) {
+    if (!entry) return null;
+    if (entry.name) return entry.name;
+    if (entry.aliases && entry.aliases.scid) return entry.aliases.scid;
+    if (entry.moves) return entry.moves;
+    return 'Ouverture inconnue';
+}
+
+function getOpeningNameFromFen(fen) {
+    if (!ecoOpenings) return null;
+    const entry = ecoOpenings[fen] || ecoOpenings[`${fen.split(' ').slice(0, 3).join(' ')} -`];
+    if (entry) {
+        return getEcoEntryLabel(entry);
+    }
+    const normalized = normalizeEcoFen(fen);
+    const fallback = ecoOpeningsByPosition ? ecoOpeningsByPosition[normalized] : null;
+    if (fallback) {
+        return getEcoEntryLabel(fallback);
+    }
+    return null;
+}
+
+function updateOpeningName(fen) {
+    const target = document.getElementById('opening-name');
+    if (!target) return;
+    if (!ecoOpenings) {
+        target.textContent = 'Chargement des ouvertures...';
+        return;
+    }
+    const opening = getOpeningNameFromFen(fen || game.fen());
+    target.textContent = opening || 'Ouverture inconnue';
 }
 
 function getSavedTreesLocal() {
@@ -418,12 +481,15 @@ function applyLoadedSnapshot(payload) {
 }
 
 function resetTreeToDefault() {
-    treeData = { id: 0, name: "START", fen: game.fen(), children: [], parent: null };
+    game.reset();
+    const startingFen = game.fen();
+    treeData = { id: 0, name: "START", fen: startingFen, children: [], parent: null };
     currentNode = treeData;
     nextNodeId = 1;
-    game.load(treeData.fen);
-    if (board) board.position(treeData.fen);
+    if (board) board.position(startingFen);
     updateVisualTree();
+    const openingLabel = document.getElementById('opening-name');
+    if (openingLabel) openingLabel.textContent = 'Nouvelle analyse';
     triggerAutoSave();
 }
 
@@ -548,6 +614,11 @@ $(document).ready(async function() {
     console.log('document.ready start');
     await preloadPieces();
     console.log('pieces preloaded');
+    await loadEcoOpenings().catch(err => {
+        console.error('Erreur chargement ECO JSON', err);
+        const target = document.getElementById('opening-name');
+        if (target) target.textContent = 'Erreur chargement ouvertures';
+    });
 
     // 1. Initialiser Chessboard.js
     board = ChessBoard('board', {
