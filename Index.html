@@ -39,13 +39,29 @@
                         <option value="uscf">USCF</option>
                     </select>
                 </div>
+                <div class="shortcut-group">
+                    <label>Raccourci Recentrer</label>
+                    <input id="shortcut-center" type="text" maxlength="1" />
+                </div>
+                <div class="shortcut-group">
+                    <label>Raccourci Début de l'arbre</label>
+                    <input id="shortcut-root" type="text" maxlength="1" />
+                </div>
+                <div class="shortcut-group">
+                    <label>Raccourci Fin de l'arbre</label>
+                    <input id="shortcut-end" type="text" maxlength="1" />
+                </div>
+                <div class="shortcut-group">
+                    <label>Raccourci Supprimer branche</label>
+                    <input id="shortcut-delete" type="text" maxlength="1" />
+                </div>
             </div>
             <div class="hints">
                 <p>⌨️ <span>Flèches</span> pour naviguer</p>
-                <p>⌨️ <span>R</span> pour recentrer</p>
-                <p>⌨️ <span>H</span> pour début de l'arbre</p>
-                <p>⌨️ <span>E</span> pour fin de l'arbre</p>
-                <p>⌨️ <span>D</span> pour supprimer branche</p>
+                <p>⌨️ <span id="hint-center">R</span> pour recentrer</p>
+                <p>⌨️ <span id="hint-root">H</span> pour début de l'arbre</p>
+                <p>⌨️ <span id="hint-end">E</span> pour fin de l'arbre</p>
+                <p>⌨️ <span id="hint-delete">D</span> pour supprimer branche</p>
                 <p>🖱️ <span>Cliquez</span> sur l'arbre pour voyager</p>
             </div>
         </div>

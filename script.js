@@ -25,6 +25,56 @@ let nextNodeId = 1;
 const pieceCache = {};
 let currentBoardTheme = localStorage.getItem('boardTheme') || 'classic';
 let currentPieceTheme = localStorage.getItem('pieceTheme') || 'wikipedia';
+let shortcuts = {
+    center: localStorage.getItem('shortcutCenter') || 'r',
+    root: localStorage.getItem('shortcutRoot') || 'h',
+    end: localStorage.getItem('shortcutEnd') || 'e',
+    delete: localStorage.getItem('shortcutDelete') || 'd'
+};
+
+function normalizeShortcutValue(value) {
+    if (!value) return '';
+    return value.trim().toLowerCase();
+}
+
+function saveShortcut(key, value) {
+    const normalized = normalizeShortcutValue(value).slice(0, 1);
+    shortcuts[key] = normalized || shortcuts[key];
+    localStorage.setItem(`shortcut${key.charAt(0).toUpperCase() + key.slice(1)}`, shortcuts[key]);
+    updateShortcutInputs();
+    updateShortcutHints();
+}
+
+function updateShortcutInputs() {
+    const center = document.getElementById('shortcut-center');
+    const root = document.getElementById('shortcut-root');
+    const end = document.getElementById('shortcut-end');
+    const del = document.getElementById('shortcut-delete');
+    if (center) center.value = shortcuts.center.toUpperCase();
+    if (root) root.value = shortcuts.root.toUpperCase();
+    if (end) end.value = shortcuts.end.toUpperCase();
+    if (del) del.value = shortcuts.delete.toUpperCase();
+}
+
+function updateShortcutHints() {
+    const hintCenter = document.getElementById('hint-center');
+    const hintRoot = document.getElementById('hint-root');
+    const hintEnd = document.getElementById('hint-end');
+    const hintDelete = document.getElementById('hint-delete');
+    if (hintCenter) hintCenter.textContent = shortcuts.center.toUpperCase();
+    if (hintRoot) hintRoot.textContent = shortcuts.root.toUpperCase();
+    if (hintEnd) hintEnd.textContent = shortcuts.end.toUpperCase();
+    if (hintDelete) hintDelete.textContent = shortcuts.delete.toUpperCase();
+}
+
+function loadShortcuts() {
+    shortcuts.center = localStorage.getItem('shortcutCenter') || 'r';
+    shortcuts.root = localStorage.getItem('shortcutRoot') || 'h';
+    shortcuts.end = localStorage.getItem('shortcutEnd') || 'e';
+    shortcuts.delete = localStorage.getItem('shortcutDelete') || 'd';
+    updateShortcutInputs();
+    updateShortcutHints();
+}
 
 // Structure de données de l'arbre
 let treeData = {
@@ -695,6 +745,7 @@ $(document).ready(async function() {
     // 1. Initialiser Chessboard.js
     initializeBoard();
     console.log('chessboard initialized');
+    loadShortcuts();
 
     // 1b. Theme selectors
     $('#board-theme-select').change(function() {
@@ -702,6 +753,18 @@ $(document).ready(async function() {
     });
     $('#piece-theme-select').change(function() {
         setPieceTheme($(this).val());
+    });
+    $('#shortcut-center').on('input', function() {
+        saveShortcut('center', $(this).val());
+    });
+    $('#shortcut-root').on('input', function() {
+        saveShortcut('root', $(this).val());
+    });
+    $('#shortcut-end').on('input', function() {
+        saveShortcut('end', $(this).val());
+    });
+    $('#shortcut-delete').on('input', function() {
+        saveShortcut('delete', $(this).val());
     });
     $('#settings-btn').click(function() {
         $('#settings-panel').toggleClass('hidden');
@@ -758,6 +821,7 @@ $(document).ready(async function() {
         }
     });
 
+    loadShortcuts();
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
@@ -794,23 +858,30 @@ $(document).ready(async function() {
 
     $(document).keydown(e => {
         if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
-        if (e.key === 'ArrowLeft' && currentNode.parent) {
+        const key = e.key.toLowerCase();
+        if (key === 'arrowleft' && currentNode.parent) {
             jumpToPosition(currentNode.parent);
+            return;
         }
-        if (e.key === 'ArrowRight' && currentNode.children.length > 0) {
+        if (key === 'arrowright' && currentNode.children.length > 0) {
             jumpToPosition(currentNode.children[0]);
+            return;
         }
-        if (e.key.toLowerCase() === 'r') {
+        if (key === shortcuts.center) {
             centerOnCurrentNode();
+            return;
         }
-        if (e.key.toLowerCase() === 'h') {
+        if (key === shortcuts.root) {
             goToRoot();
+            return;
         }
-        if (e.key.toLowerCase() === 'e') {
+        if (key === shortcuts.end) {
             goToEnd();
+            return;
         }
-        if (e.key.toLowerCase() === 'd') {
+        if (key === shortcuts.delete) {
             deleteCurrentBranch();
+            return;
         }
     });
 
