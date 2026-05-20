@@ -218,6 +218,185 @@ function triggerAutoSave() {
     });
 }
 
+function getSavedTreesLocal() {
+    return JSON.parse(localStorage.getItem('savedTrees') || '{}');
+}
+
+function setSavedTreesLocal(saves) {
+    localStorage.setItem('savedTrees', JSON.stringify(saves));
+}
+
+function setSaveStatus(message, isError = false) {
+    const status = document.getElementById('save-status');
+    if (!status) return;
+    status.textContent = message;
+    status.style.color = isError ? '#e74c3c' : '#a0a0a0';
+}
+
+function renderSaveList() {
+    const container = document.getElementById('save-list');
+    if (!container) return;
+    const localSaved = getSavedTreesLocal();
+    const saves = [];
+    for (const [id, payload] of Object.entries(localSaved)) {
+        saves.push({ id, storage: 'local', name: payload.name, timestamp: payload.timestamp });
+    }
+    if (currentUser) {
+        db.ref('users/' + currentUser.uid + '/savedTrees').once('value').then(snapshot => {
+            const firebaseSaved = snapshot.val() || {};
+            for (const [id, payload] of Object.entries(firebaseSaved)) {
+                saves.push({ id, storage: 'firebase', name: payload.name, timestamp: payload.timestamp });
+            }
+            renderSaveRows(container, saves);
+        }).catch(err => {
+            console.error('Erreur lecture sauvegardes cloud', err);
+            renderSaveRows(container, saves);
+        });
+    } else {
+        renderSaveRows(container, saves);
+    }
+}
+
+function renderSaveRows(container, saves) {
+    container.innerHTML = '';
+    if (saves.length === 0) {
+        const emptyRow = document.createElement('div');
+        emptyRow.className = 'save-status';
+        emptyRow.textContent = 'Aucune sauvegarde disponible.';
+        container.appendChild(emptyRow);
+        return;
+    }
+    saves.sort((a, b) => b.timestamp - a.timestamp);
+    for (const save of saves) {
+        const row = document.createElement('div');
+        row.className = 'save-row';
+        row.innerHTML = `
+            <div class="save-meta">
+                <strong>${save.name}</strong>
+                <span>${save.storage === 'firebase' ? 'Cloud' : 'Local'} · ${new Date(save.timestamp).toLocaleString()}</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-sm btn-primary load-save-btn" data-id="${save.id}" data-storage="${save.storage}">Charger</button>
+                <button class="btn btn-sm btn-danger delete-save-btn" data-id="${save.id}" data-storage="${save.storage}">Suppr</button>
+            </div>
+        `;
+        container.appendChild(row);
+    }
+}
+
+function updateSaveButtons() {
+    const firebaseBtn = document.getElementById('save-firebase-btn');
+    if (!firebaseBtn) return;
+    if (currentUser) {
+        firebaseBtn.disabled = false;
+        firebaseBtn.textContent = 'Sauvegarder cloud';
+    } else {
+        firebaseBtn.disabled = true;
+        firebaseBtn.textContent = 'Cloud (connexion requise)';
+    }
+}
+
+function saveSnapshot(storageType = 'local') {
+    const input = document.getElementById('save-name');
+    if (!input) return;
+    const name = input.value.trim();
+    if (!name) {
+        setSaveStatus('Veuillez saisir un nom de sauvegarde.', true);
+        return;
+    }
+    const payload = {
+        name,
+        timestamp: Date.now(),
+        tree: serializeTree(treeData),
+        currentId: currentNode.id,
+        nextNodeId: nextNodeId
+    };
+    const id = 'save-' + Date.now();
+    if (storageType === 'firebase') {
+        if (!currentUser) {
+            setSaveStatus('Connectez-vous pour sauvegarder dans le cloud.', true);
+            return;
+        }
+        db.ref('users/' + currentUser.uid + '/savedTrees/' + id).set(payload).then(() => {
+            setSaveStatus('Sauvegarde cloud créée.');
+            renderSaveList();
+        }).catch(err => {
+            console.error(err);
+            setSaveStatus('Erreur lors de la sauvegarde cloud.', true);
+        });
+    } else {
+        const saved = getSavedTreesLocal();
+        saved[id] = payload;
+        setSavedTreesLocal(saved);
+        setSaveStatus('Sauvegarde locale créée.');
+        renderSaveList();
+    }
+}
+
+function loadSaved(id, storageType = 'local') {
+    if (!id) return;
+    if (storageType === 'firebase') {
+        if (!currentUser) {
+            setSaveStatus('Connexion requise pour charger depuis le cloud.', true);
+            return;
+        }
+        db.ref('users/' + currentUser.uid + '/savedTrees/' + id).once('value').then(snapshot => {
+            const payload = snapshot.val();
+            if (!payload) {
+                setSaveStatus('Sauvegarde introuvable dans le cloud.', true);
+                return;
+            }
+            applyLoadedSnapshot(payload);
+            setSaveStatus('Sauvegarde cloud chargée.');
+        }).catch(err => {
+            console.error(err);
+            setSaveStatus('Erreur lors du chargement cloud.', true);
+        });
+    } else {
+        const saved = getSavedTreesLocal();
+        const payload = saved[id];
+        if (!payload) {
+            setSaveStatus('Sauvegarde locale introuvable.', true);
+            return;
+        }
+        applyLoadedSnapshot(payload);
+        setSaveStatus('Sauvegarde locale chargée.');
+    }
+}
+
+function deleteSaved(id, storageType = 'local') {
+    if (!id) return;
+    if (storageType === 'firebase') {
+        if (!currentUser) {
+            setSaveStatus('Connexion requise pour supprimer dans le cloud.', true);
+            return;
+        }
+        db.ref('users/' + currentUser.uid + '/savedTrees/' + id).remove().then(() => {
+            setSaveStatus('Sauvegarde cloud supprimée.');
+            renderSaveList();
+        }).catch(err => {
+            console.error(err);
+            setSaveStatus('Erreur lors de la suppression cloud.', true);
+        });
+    } else {
+        const saved = getSavedTreesLocal();
+        delete saved[id];
+        setSavedTreesLocal(saved);
+        setSaveStatus('Sauvegarde locale supprimée.');
+        renderSaveList();
+    }
+}
+
+function applyLoadedSnapshot(payload) {
+    treeData = deserializeTree(payload.tree);
+    nextNodeId = payload.nextNodeId || 1;
+    currentNode = findNodeById(treeData, payload.currentId) || treeData;
+    game.load(currentNode.fen);
+    if (board) board.position(currentNode.fen);
+    updateVisualTree();
+    centerOnCurrentNode();
+}
+
 function resetTreeToDefault() {
     treeData = { id: 0, name: "START", fen: game.fen(), children: [], parent: null };
     currentNode = treeData;
@@ -382,6 +561,15 @@ $(document).ready(async function() {
     });
     $('#promo-cancel').click(hidePromotionModal);
 
+    $('#save-local-btn').click(() => saveSnapshot('local'));
+    $('#save-firebase-btn').click(() => saveSnapshot('firebase'));
+    $('#save-list').on('click', '.load-save-btn', function() {
+        loadSaved($(this).data('id'), $(this).data('storage'));
+    });
+    $('#save-list').on('click', '.delete-save-btn', function() {
+        deleteSaved($(this).data('id'), $(this).data('storage'));
+    });
+
     // Ouverture / Fermeture modale
     const authModal = $('#auth-modal');
     $(document).on('click', '#auth-btn', function(e) {
@@ -423,12 +611,16 @@ $(document).ready(async function() {
                     board.position(currentNode.fen);
                 }
                 updateVisualTree();
+                updateSaveButtons();
+                renderSaveList();
             });
         } else {
             currentUser = null;
             $('#user-info').hide();
             $('#auth-btn').text("Connexion / Inscription").removeClass("btn-danger").addClass("btn-primary");
             resetTreeToDefault();
+            updateSaveButtons();
+            renderSaveList();
         }
     });
 
@@ -454,5 +646,7 @@ $(document).ready(async function() {
         }
     });
 
+    updateSaveButtons();
+    renderSaveList();
     updateVisualTree();
 });

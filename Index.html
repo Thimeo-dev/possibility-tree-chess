@@ -38,6 +38,16 @@
             
             <div id="user-info" style="display: none; margin: 10px 0 5px 0; font-size: 0.85rem; color: #a0a0a0; text-align: center;"></div>
             <button id="auth-btn" class="btn-primary">Connexion / Inscription</button>
+            <div id="save-panel" class="save-panel">
+                <h2>Sauvegardes</h2>
+                <input id="save-name" type="text" placeholder="Nom de la sauvegarde" />
+                <div class="save-actions">
+                    <button id="save-local-btn">Sauvegarder local</button>
+                    <button id="save-firebase-btn">Sauvegarder cloud</button>
+                </div>
+                <div id="save-status" class="save-status" aria-live="polite"></div>
+                <div id="save-list"></div>
+            </div>
         </div>
     </aside>
     

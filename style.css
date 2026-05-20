@@ -116,6 +116,76 @@ h1 {
     background: #cf4545;
 }
 
+.save-panel {
+    background: #252525;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: grid;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.save-panel h2 {
+    margin: 0;
+    color: var(--accent);
+    font-size: 1rem;
+}
+
+.save-panel input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #1a1a1a;
+    color: white;
+    box-sizing: border-box;
+}
+
+.save-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.save-status {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    min-height: 1.2rem;
+}
+
+.save-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.save-row:first-child {
+    border-top: none;
+}
+
+.save-meta {
+    display: grid;
+    gap: 4px;
+}
+
+.save-meta strong {
+    font-size: 0.95rem;
+}
+
+.save-meta span {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+}
+
+.save-row button {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+}
+
 .btn-primary {
     background: var(--accent) !important;
     color: white;
