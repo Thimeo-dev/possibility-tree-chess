@@ -137,18 +137,17 @@ function getBoardThemeColors(theme = currentBoardTheme) {
     }
 }
 
-function renderMiniBoard(canvasId, fen) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+function renderMiniBoardImage(imageId, fen) {
+    const image = document.getElementById(imageId);
+    if (!image) return;
+
     const size = 200;
     const ratio = window.devicePixelRatio || 1;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
 
-    canvas.style.width = size + 'px';
-    canvas.style.height = size + 'px';
     canvas.width = Math.round(size * ratio);
     canvas.height = Math.round(size * ratio);
-
     if (typeof ctx.setTransform === 'function') {
         try { ctx.setTransform(1, 0, 0, 1, 0, 0); } catch (e) {}
     }
@@ -168,15 +167,15 @@ function renderMiniBoard(canvasId, fen) {
     const rows = fen.split(' ')[0].split('/');
     rows.forEach((row, r) => {
         let c = 0;
-        for (let char of row) {
+        for (const char of row) {
             if (!isNaN(char)) {
                 c += parseInt(char, 10);
             } else {
                 const key = (char === char.toUpperCase() ? 'w' : 'b') + char.toUpperCase();
-                const img = pieceCache[key];
-                if (img) {
+                const piece = pieceCache[key];
+                if (piece && piece.complete) {
                     try {
-                        ctx.drawImage(img, c * sq, r * sq, sq, sq);
+                        ctx.drawImage(piece, c * sq, r * sq, sq, sq);
                     } catch (e) {
                         // ignore drawing errors
                     }
@@ -185,6 +184,10 @@ function renderMiniBoard(canvasId, fen) {
             }
         }
     });
+
+    image.width = size;
+    image.height = size;
+    image.src = canvas.toDataURL('image/png');
 }
 
 function updateVisualTree() {
@@ -219,8 +222,11 @@ function updateVisualTree() {
         .attr("width", 210).attr("height", 250).attr("x", -105).attr("y", -105)
         .append("xhtml:div").html(d => `
             <div style="text-align:center; cursor:pointer;">
-                <canvas id="canvas-${d.data.id}" 
-                        style="width:200px; height:200px; border-radius:6px; display:inline-block;"></canvas>
+                <img id="image-${d.data.id}"
+                     class="tree-board-image"
+                     src=""
+                     alt="Plateau ${d.data.name}"
+                     style="width:200px; height:200px; border-radius:6px; display:inline-block; object-fit:cover;" />
                 <div style="color:white; font-weight:bold; margin-top:8px; font-size:16px; font-family: sans-serif;">${d.data.name}</div>
             </div>
         `);
@@ -228,12 +234,12 @@ function updateVisualTree() {
     nodeUpdate.transition().duration(400).attr("transform", d => `translate(${d.y},${d.x})`);
 
     // Mise en évidence et bordures
-    nodeUpdate.select("canvas")
+    nodeUpdate.select("img")
         .style("border", d => d.data.id === currentNode.id ? "5px solid #3498db" : "5px solid transparent")
         .style("box-shadow", d => d.data.id === currentNode.id ? "0 0 25px rgba(52, 152, 219, 0.7)" : "0 4px 10px rgba(0,0,0,0.5)");
 
     setTimeout(() => {
-        root.descendants().forEach(d => renderMiniBoard(`canvas-${d.data.id}`, d.data.fen));
+        root.descendants().forEach(d => renderMiniBoardImage(`image-${d.data.id}`, d.data.fen));
     }, 50);
 
     nodes.exit().remove();
@@ -338,15 +344,35 @@ function getOpeningNameFromFen(fen) {
     return null;
 }
 
-function updateOpeningName(fen) {
+async function updateOpeningName(fen) {
     const target = document.getElementById('opening-name');
     if (!target) return;
-    if (!ecoOpenings) {
-        target.textContent = 'Chargement des ouvertures...';
-        return;
+    
+    // Essayer d'abord l'API Lichess (public, sans token requis)
+    try {
+        target.textContent = 'Recherche ouverture...';
+        const fenToQuery = fen || game.fen();
+        const response = await fetch(`https://explorer.lichess.org/masters?fen=${encodeURIComponent(fenToQuery)}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.opening && data.opening.name) {
+                const eco = data.opening.eco || '';
+                target.textContent = eco ? `${eco} - ${data.opening.name}` : data.opening.name;
+                return;
+            }
+        }
+    } catch (err) {
+        // Silencieux, on utilise le fallback JSON
+        console.debug('Lichess API unavailable, using local data');
     }
-    const opening = getOpeningNameFromFen(fen || game.fen());
-    target.textContent = opening || 'Ouverture inconnue';
+    
+    // Fallback : utiliser les données JSON locales
+    if (ecoOpenings) {
+        const opening = getOpeningNameFromFen(fen || game.fen());
+        target.textContent = opening || 'Ouverture inconnue';
+    } else {
+        target.textContent = 'Chargement des ouvertures...';
+    }
 }
 
 function getPieceThemeUrl(theme) {
