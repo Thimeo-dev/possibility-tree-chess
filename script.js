@@ -221,11 +221,14 @@ function updateVisualTree() {
     nodeEnter.append("foreignObject")
         .attr("width", 210).attr("height", 250).attr("x", -105).attr("y", -105)
         .append("xhtml:div").html(d => `
-            <div style="text-align:center; cursor:pointer;">
+            <div class="tree-node-wrapper" style="text-align:center; cursor:pointer;">
                 <img id="image-${d.data.id}"
                      class="tree-board-image"
                      src=""
                      alt="Plateau ${d.data.name}"
+                     draggable="false"
+                     ondragstart="event.preventDefault();"
+                     onmousedown="event.preventDefault();"
                      style="width:200px; height:200px; border-radius:6px; display:inline-block; object-fit:cover;" />
                 <div style="color:white; font-weight:bold; margin-top:8px; font-size:16px; font-family: sans-serif;">${d.data.name}</div>
             </div>
