@@ -210,26 +210,36 @@ function updateVisualTree() {
 
     // Lignes de connexion (Liens)
     const links = g.selectAll(".link").data(root.links(), d => d.target.data.id);
-    
-    links.enter().insert("path", "g") // Insérer avant les groupes de nœuds pour être "derrière"
-        .attr("class", "link")
-        .attr("id", d => `link-${d.target.data.id}`)
+    const hitLinks = g.selectAll(".link-hit").data(root.links(), d => d.target.data.id);
+
+    const computeLinkPath = d => {
+        const s = { x: d.source.y + 80, y: d.source.x };
+        const t = { x: d.target.y - 80, y: d.target.x };
+        return `M${s.x},${s.y}C${(s.x + t.x) / 2},${s.y} ${(s.x + t.x) / 2},${t.y} ${t.x},${t.y}`;
+    };
+
+    hitLinks.enter().insert("path", "g")
+        .attr("class", "link-hit")
+        .merge(hitLinks)
+        .attr("id", d => `link-hit-${d.target.data.id}`)
+        .attr("d", computeLinkPath)
         .on('click', (e, d) => {
             e.stopPropagation();
             selectedEdgeTargetId = d.target.data.id;
+            openEdgeNoteForNode(d.target.data.id);
             updateVisualTree();
-        })
+        });
+    hitLinks.exit().remove();
+
+    links.enter().insert("path", "g") // Insérer avant les groupes de nœuds pour être "derrière"
+        .attr("class", "link")
+        .attr("id", d => `link-${d.target.data.id}`)
         .merge(links).transition().duration(400)
-        .attr("d", d => {
-            // Ajustement des points d'ancrage pour éviter l'effet coupé
-            // On réduit le décalage à 80 pour que la ligne pénètre dans le cadre du plateau
-            const s = { x: d.source.y + 80, y: d.source.x };
-            const t = { x: d.target.y - 80, y: d.target.x };
-            return `M${s.x},${s.y}C${(s.x + t.x) / 2},${s.y} ${(s.x + t.x) / 2},${t.y} ${t.x},${t.y}`;
-        })
+        .attr("d", computeLinkPath)
         .style('stroke', d => selectedEdgeTargetId === d.target.data.id ? '#3498db' : '#444')
         .style('stroke-width', d => selectedEdgeTargetId === d.target.data.id ? 5 : 3)
-        .style('opacity', 0.9);
+        .style('opacity', 0.9)
+        .style('pointer-events', 'none');
     links.exit().remove();
 
     // Link labels (text on branches)
@@ -268,7 +278,7 @@ function updateVisualTree() {
         .on("click", (e, d) => jumpToPosition(d.data));
 
     nodeEnter.append("foreignObject")
-        .attr("width", 210).attr("height", 300).attr("x", -105).attr("y", -110)
+        .attr("width", 210).attr("height", 320).attr("x", -105).attr("y", -120)
         .append("xhtml:div").html(d => `
             <div style="text-align:center; cursor:pointer;">
                 <img id="image-${d.data.id}"
@@ -278,6 +288,7 @@ function updateVisualTree() {
                      style="width:200px; height:200px; border-radius:6px; display:inline-block; object-fit:cover;" />
                 <div style="color:white; font-weight:bold; margin-top:8px; font-size:16px; font-family: sans-serif;">${d.data.name}</div>
                 <div class="node-note" style="color:#d0d0d0; font-size:12px; margin-top:6px; max-width:200px;">${d.data.note ? d.data.note : ''}</div>
+                ${d.data.id !== 0 ? `<button class="node-edge-note-btn" onclick="event.stopPropagation(); openEdgeNoteForNode(${d.data.id})">✎</button>` : ''}
             </div>
         `);
     const nodeUpdate = nodeEnter.merge(nodes);
@@ -357,6 +368,18 @@ function triggerAutoSave() {
         currentId: currentNode.id,
         nextNodeId: nextNodeId
     }, { merge: true });
+}
+
+function openEdgeNoteForNode(nodeId) {
+    selectedEdgeTargetId = nodeId;
+    const targetNode = findNodeById(treeData, nodeId);
+    if (!targetNode) return;
+    const modal = document.getElementById('edge-note-modal');
+    const ta = document.getElementById('edge-note-text');
+    if (!modal || !ta) return;
+    ta.value = targetNode.edgeNote || '';
+    modal.style.display = 'flex';
+    ta.focus();
 }
 
 function normalizeEcoFen(fen) {
@@ -904,20 +927,6 @@ $(document).ready(async function() {
 
     $('#save-local-btn').click(() => saveSnapshot('local'));
     $('#save-firebase-btn').click(() => saveSnapshot('firebase'));
-
-    // Floating add/edit edge note button
-    // Open edge-note modal when floating button clicked
-    $('#add-edge-note-btn').click(() => {
-        if (!selectedEdgeTargetId) return alert("Sélectionne d'abord une branche en cliquant sur une ligne de l'arbre.");
-        const targetNode = findNodeById(treeData, selectedEdgeTargetId);
-        if (!targetNode) return alert('Nœud introuvable');
-        const modal = document.getElementById('edge-note-modal');
-        const ta = document.getElementById('edge-note-text');
-        if (!modal || !ta) return;
-        ta.value = targetNode.edgeNote || '';
-        modal.style.display = 'flex';
-        ta.focus();
-    });
 
     // Modal save/cancel handlers
     $('#edge-note-save').click(() => {
