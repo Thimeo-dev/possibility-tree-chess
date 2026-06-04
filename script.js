@@ -845,21 +845,6 @@ $(document).ready(async function() {
     });
     // set initial labels
     if (document.getElementById('toggle-glow-btn')) document.getElementById('toggle-glow-btn').textContent = hideTreeGlow ? 'Afficher lueur' : 'Masquer lueur';
-    $('#reset-visual-btn').click(() => {
-        hideTreeBorder = false;
-        hideTreeGlow = false;
-        localStorage.setItem('hideTreeBorder', hideTreeBorder);
-        localStorage.setItem('hideTreeGlow', hideTreeGlow);
-        const toggleBorder = document.getElementById('toggle-border-btn');
-        const toggleGlow = document.getElementById('toggle-glow-btn');
-        if (toggleBorder) toggleBorder.textContent = 'Masquer contour';
-        if (toggleGlow) toggleGlow.textContent = 'Masquer lueur';
-        // ensure images are visible
-        document.querySelectorAll('.tree-board-image').forEach(img => {
-            try { img.style.display = 'inline-block'; img.style.visibility = 'visible'; img.style.opacity = '1'; } catch (e) {}
-        });
-        updateVisualTree();
-    });
     $('#promotion-modal .promo-buttons button').click(function() {
         choosePromotion($(this).data('piece'));
     });
