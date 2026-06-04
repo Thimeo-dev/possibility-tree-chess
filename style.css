@@ -407,30 +407,18 @@ h1 {
     overflow: visible;
 }
 
-#tree-container,
-#tree-container foreignObject,
-#tree-container foreignObject *,
-#tree-container img.tree-board-image,
-.tree-node-wrapper {
-    -webkit-user-drag: none;
-    -webkit-user-select: none;
-    user-select: none;
-    -webkit-touch-callout: none;
-    -webkit-tap-highlight-color: transparent;
-    outline: none !important;
-    touch-action: manipulation;
+/* Ensure images in nodes have no default shadow; JS controls glow */
+.node img {
+    box-shadow: none !important;
 }
 
-.node img {
+.node canvas {
     box-shadow: 0 0 15px rgba(0,0,0,0.6);
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     background: #000;
-    backface-visibility: hidden;
-    transform: translateZ(0);
-    will-change: transform, opacity;
 }
 
-.node:hover img {
+.node:hover canvas {
     transform: scale(1.05);
 }
 

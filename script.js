@@ -89,6 +89,8 @@ let pendingPromotion = null;
 let zoom = null;
 let currentUser = null; //  Pour suivre l'utilisateur connecté
 let isSignUpMode = false; //  Pour basculer entre Connexion et Inscription = {};
+let hideTreeBorder = localStorage.getItem('hideTreeBorder') === 'true';
+let hideTreeGlow = localStorage.getItem('hideTreeGlow') === 'true';
 
 // Paramètres D3
 const margin = { top: 50, right: 150, bottom: 50, left: 150 };
@@ -118,6 +120,16 @@ async function preloadPieces(theme = currentPieceTheme) {
     const pieces = [];
     ['w', 'b'].forEach(c => ['P', 'N', 'B', 'R', 'Q', 'K'].forEach(t => pieces.push(c + t)));
     await Promise.all(pieces.map(p => new Promise(resolve => {
+        const toggleBorderBtn = document.getElementById('toggle-border-btn');
+        if (toggleBorderBtn) {
+            toggleBorderBtn.textContent = hideTreeBorder ? 'Afficher contour' : 'Masquer contour';
+            toggleBorderBtn.addEventListener('click', () => {
+                hideTreeBorder = !hideTreeBorder;
+                localStorage.setItem('hideTreeBorder', hideTreeBorder);
+                toggleBorderBtn.textContent = hideTreeBorder ? 'Afficher contour' : 'Masquer contour';
+                updateVisualTree();
+            });
+        }
         const img = new Image();
         img.src = getPieceThemeUrl(theme).replace('{piece}', p);
         img.crossOrigin = 'anonymous';
@@ -221,14 +233,11 @@ function updateVisualTree() {
     nodeEnter.append("foreignObject")
         .attr("width", 210).attr("height", 250).attr("x", -105).attr("y", -105)
         .append("xhtml:div").html(d => `
-            <div class="tree-node-wrapper" style="text-align:center; cursor:pointer;">
+            <div style="text-align:center; cursor:pointer;">
                 <img id="image-${d.data.id}"
                      class="tree-board-image"
                      src=""
                      alt="Plateau ${d.data.name}"
-                     draggable="false"
-                     ondragstart="event.preventDefault();"
-                     onmousedown="event.preventDefault();"
                      style="width:200px; height:200px; border-radius:6px; display:inline-block; object-fit:cover;" />
                 <div style="color:white; font-weight:bold; margin-top:8px; font-size:16px; font-family: sans-serif;">${d.data.name}</div>
             </div>
@@ -236,10 +245,16 @@ function updateVisualTree() {
     const nodeUpdate = nodeEnter.merge(nodes);
     nodeUpdate.transition().duration(400).attr("transform", d => `translate(${d.y},${d.x})`);
 
-    // Mise en évidence et bordures
+    // Mise en évidence, bordures et lueur
     nodeUpdate.select("img")
-        .style("border", d => d.data.id === currentNode.id ? "5px solid #3498db" : "5px solid transparent")
-        .style("box-shadow", d => d.data.id === currentNode.id ? "0 0 25px rgba(52, 152, 219, 0.7)" : "0 4px 10px rgba(0,0,0,0.5)");
+        .style("border", d => {
+            if (hideTreeBorder) return "5px solid transparent";
+            return d.data.id === currentNode.id ? "5px solid #3498db" : "5px solid transparent";
+        })
+        .style("box-shadow", d => {
+            if (hideTreeGlow) return "none";
+            return d.data.id === currentNode.id ? "0 0 25px rgba(52, 152, 219, 0.7)" : "0 4px 10px rgba(0,0,0,0.5)";
+        });
 
     setTimeout(() => {
         root.descendants().forEach(d => renderMiniBoardImage(`image-${d.data.id}`, d.data.fen));
@@ -808,17 +823,6 @@ $(document).ready(async function() {
 
     g = svg.append("g").attr("transform", `translate(${margin.left}, ${window.innerHeight / 2})`);
     treeLayout = d3.tree().nodeSize([280, 450]);
-
-    const treeContainerEl = document.getElementById('tree-container');
-    if (treeContainerEl) {
-        treeContainerEl.addEventListener('dragstart', e => e.preventDefault());
-        treeContainerEl.addEventListener('mousedown', e => {
-            if (e.target.closest && e.target.closest('.tree-board-image')) {
-                e.preventDefault();
-            }
-        });
-    }
-
     console.log('d3 initialized, svg/g/treeLayout ready');
 
     // 3. Évènements
@@ -827,6 +831,35 @@ $(document).ready(async function() {
     $('#root-btn').click(goToRoot);
     $('#end-btn').click(goToEnd);
     $('#delete-btn').click(deleteCurrentBranch);
+    $('#toggle-border-btn').click(() => {
+        hideTreeBorder = !hideTreeBorder;
+        localStorage.setItem('hideTreeBorder', hideTreeBorder);
+        document.getElementById('toggle-border-btn').textContent = hideTreeBorder ? 'Afficher contour' : 'Masquer contour';
+        updateVisualTree();
+    });
+    $('#toggle-glow-btn').click(() => {
+        hideTreeGlow = !hideTreeGlow;
+        localStorage.setItem('hideTreeGlow', hideTreeGlow);
+        document.getElementById('toggle-glow-btn').textContent = hideTreeGlow ? 'Afficher lueur' : 'Masquer lueur';
+        updateVisualTree();
+    });
+    // set initial labels
+    if (document.getElementById('toggle-glow-btn')) document.getElementById('toggle-glow-btn').textContent = hideTreeGlow ? 'Afficher lueur' : 'Masquer lueur';
+    $('#reset-visual-btn').click(() => {
+        hideTreeBorder = false;
+        hideTreeGlow = false;
+        localStorage.setItem('hideTreeBorder', hideTreeBorder);
+        localStorage.setItem('hideTreeGlow', hideTreeGlow);
+        const toggleBorder = document.getElementById('toggle-border-btn');
+        const toggleGlow = document.getElementById('toggle-glow-btn');
+        if (toggleBorder) toggleBorder.textContent = 'Masquer contour';
+        if (toggleGlow) toggleGlow.textContent = 'Masquer lueur';
+        // ensure images are visible
+        document.querySelectorAll('.tree-board-image').forEach(img => {
+            try { img.style.display = 'inline-block'; img.style.visibility = 'visible'; img.style.opacity = '1'; } catch (e) {}
+        });
+        updateVisualTree();
+    });
     $('#promotion-modal .promo-buttons button').click(function() {
         choosePromotion($(this).data('piece'));
     });
