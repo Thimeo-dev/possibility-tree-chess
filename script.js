@@ -94,6 +94,124 @@ let hideTreeGlow = localStorage.getItem('hideTreeGlow') === 'true';
 let selectedEdgeTargetId = null;
 let autoCenterAfterMove = true;
 
+function fetchOpeningMovesFromApi(fen, maxMoves = 8) {
+    const endpoints = [
+        `https://explorer.lichess.ovh/masters?fen=${encodeURIComponent(fen)}`,
+        `https://explorer.lichess.org/masters?fen=${encodeURIComponent(fen)}`
+    ];
+
+    function tryEndpoint(url) {
+        return fetch(url, { headers: { Accept: 'application/json' } })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            });
+    }
+
+    return tryEndpoint(endpoints[0]).catch(() => tryEndpoint(endpoints[1])).then(data => {
+        if (!data || !Array.isArray(data.moves)) return [];
+        return data.moves.slice(0, maxMoves);
+    });
+}
+
+function getLocalOpeningNextMoves(fen) {
+    if (!ecoOpeningsByPosition) return [];
+    const tempGame = new Chess(fen);
+    const moves = tempGame.moves({ verbose: true });
+    const openingMoves = [];
+
+    moves.forEach(move => {
+        tempGame.move(move);
+        const nextFen = normalizeEcoFen(tempGame.fen());
+        const entry = ecoOpeningsByPosition[nextFen] || ecoOpenings[nextFen];
+        if (entry) {
+            openingMoves.push({
+                san: move.san,
+                from: move.from,
+                to: move.to,
+                promotion: move.promotion
+            });
+        }
+        tempGame.undo();
+    });
+
+    return openingMoves;
+}
+
+function importOpeningFromApi() {
+    const fen = currentNode ? currentNode.fen : game.fen();
+    setSaveStatus('Importation de l’ouverture en cours...', false);
+    fetchOpeningMovesFromApi(fen)
+        .then(moves => {
+            if (!moves.length) {
+                throw new Error('Aucune ouverture trouvée via l’API');
+            }
+            return importMovesIntoTree(fen, moves);
+        })
+        .catch(err => {
+            console.warn('API opening failed, falling back to local ECO data:', err);
+            const localMoves = getLocalOpeningNextMoves(fen);
+            if (localMoves.length) {
+                importMovesIntoTree(fen, localMoves, true);
+                return;
+            }
+            setSaveStatus(`Erreur import ouverture : ${err.message || err}`, true);
+        });
+}
+
+function importMovesIntoTree(fen, moves, isLocal = false) {
+    const tempGame = new Chess(fen);
+    const addedMoves = [];
+
+    moves.forEach(moveData => {
+        const san = moveData.san;
+        const existing = currentNode.children.find(child => child.name === san);
+        if (existing) return;
+
+        let move;
+        if (isLocal) {
+            move = tempGame.move({
+                from: moveData.from,
+                to: moveData.to,
+                promotion: moveData.promotion
+            });
+        } else {
+            const uci = moveData.uci || `${moveData.from}${moveData.to}${moveData.promotion || ''}`;
+            move = tempGame.move({
+                from: uci.slice(0, 2),
+                to: uci.slice(2, 4),
+                promotion: uci.length === 5 ? uci[4] : undefined
+            });
+        }
+
+        if (!move) return;
+
+        const newNode = {
+            id: nextNodeId++,
+            name: san,
+            fen: tempGame.fen(),
+            children: [],
+            parent: currentNode,
+            note: '',
+            edgeNote: ''
+        };
+        currentNode.children.push(newNode);
+        addedMoves.push(san);
+        tempGame.undo();
+    });
+
+    if (!addedMoves.length) {
+        setSaveStatus('Les coups d’ouverture existent déjà dans l’arbre.', false);
+        return;
+    }
+
+    updateVisualTree();
+    setSaveStatus(`Ouverture importée : ${addedMoves.join(', ')}`, false);
+    triggerAutoSave();
+}
+
 // Paramètres D3
 const margin = { top: 50, right: 150, bottom: 50, left: 150 };
 let svg, g, treeLayout;
@@ -923,6 +1041,7 @@ $(document).ready(async function() {
     // 3. Évènements
     $('#reset-btn').click(resetTreeToDefault);
     $('#auto-center-btn').click(toggleAutoCenterAfterMove);
+    $('#load-opening-btn').click(importOpeningFromApi);
     $('#center-btn').click(centerOnCurrentNode);
     $('#root-btn').click(goToRoot);
     $('#end-btn').click(goToEnd);
