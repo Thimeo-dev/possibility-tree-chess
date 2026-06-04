@@ -180,11 +180,10 @@ h1 {
     margin-top: 16px;
 }
 
-.tree-board-image {
-    -webkit-user-drag: none;
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
-    outline: none;
+.save-panel h2 {
+    margin: 0;
+    color: var(--accent);
+    font-size: 1rem;
 }
 
 .save-panel input {
@@ -408,13 +407,28 @@ h1 {
     overflow: visible;
 }
 
-.node canvas {
+#tree-container,
+#tree-container foreignObject,
+#tree-container foreignObject *,
+#tree-container img.tree-board-image {
+    -webkit-user-drag: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    outline: none !important;
+    touch-action: manipulation;
+}
+
+.node img {
     box-shadow: 0 0 15px rgba(0,0,0,0.6);
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     background: #000;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    will-change: transform, opacity;
 }
 
-.node:hover canvas {
+.node:hover img {
     transform: scale(1.05);
 }
 

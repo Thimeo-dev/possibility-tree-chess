@@ -226,7 +226,6 @@ function updateVisualTree() {
                      class="tree-board-image"
                      src=""
                      alt="Plateau ${d.data.name}"
-                     draggable="false"
                      style="width:200px; height:200px; border-radius:6px; display:inline-block; object-fit:cover;" />
                 <div style="color:white; font-weight:bold; margin-top:8px; font-size:16px; font-family: sans-serif;">${d.data.name}</div>
             </div>
@@ -806,6 +805,17 @@ $(document).ready(async function() {
 
     g = svg.append("g").attr("transform", `translate(${margin.left}, ${window.innerHeight / 2})`);
     treeLayout = d3.tree().nodeSize([280, 450]);
+
+    const treeContainerEl = document.getElementById('tree-container');
+    if (treeContainerEl) {
+        treeContainerEl.addEventListener('dragstart', e => e.preventDefault());
+        treeContainerEl.addEventListener('mousedown', e => {
+            if (e.target.closest && e.target.closest('.tree-board-image')) {
+                e.preventDefault();
+            }
+        });
+    }
+
     console.log('d3 initialized, svg/g/treeLayout ready');
 
     // 3. Évènements
