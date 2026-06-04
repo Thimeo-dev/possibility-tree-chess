@@ -92,6 +92,7 @@ let isSignUpMode = false; //  Pour basculer entre Connexion et Inscription = {};
 let hideTreeBorder = localStorage.getItem('hideTreeBorder') === 'true';
 let hideTreeGlow = localStorage.getItem('hideTreeGlow') === 'true';
 let selectedEdgeTargetId = null;
+let autoCenterAfterMove = true;
 
 // Paramètres D3
 const margin = { top: 50, right: 150, bottom: 50, left: 150 };
@@ -727,6 +728,22 @@ function resetTreeToDefault() {
     triggerAutoSave();
 }
 
+function toggleAutoCenterAfterMove() {
+    autoCenterAfterMove = !autoCenterAfterMove;
+    const btn = document.getElementById('auto-center-btn');
+    if (btn) {
+        btn.textContent = autoCenterAfterMove ? 'Auto-recentrage : ON' : 'Auto-recentrage : OFF';
+        btn.style.backgroundColor = autoCenterAfterMove ? '' : '#555';
+    }
+}
+
+function updateAutoCenterButton() {
+    const btn = document.getElementById('auto-center-btn');
+    if (!btn) return;
+    btn.textContent = autoCenterAfterMove ? 'Auto-recentrage : ON' : 'Auto-recentrage : OFF';
+    btn.style.backgroundColor = autoCenterAfterMove ? '' : '#555';
+}
+
 function getDeepestLeaf(node) {
     let current = node;
     while (current.children.length > 0) {
@@ -773,6 +790,9 @@ function addMoveNode(move) {
         currentNode = existing;
     }
     updateVisualTree();
+    if (autoCenterAfterMove) {
+        centerOnCurrentNode();
+    }
     triggerAutoSave();
 }
 
@@ -902,6 +922,7 @@ $(document).ready(async function() {
 
     // 3. Évènements
     $('#reset-btn').click(resetTreeToDefault);
+    $('#auto-center-btn').click(toggleAutoCenterAfterMove);
     $('#center-btn').click(centerOnCurrentNode);
     $('#root-btn').click(goToRoot);
     $('#end-btn').click(goToEnd);
@@ -926,6 +947,7 @@ $(document).ready(async function() {
     $('#promo-cancel').click(hidePromotionModal);
 
     $('#save-local-btn').click(() => saveSnapshot('local'));
+    updateAutoCenterButton();
     $('#save-firebase-btn').click(() => saveSnapshot('firebase'));
 
     // Modal save/cancel handlers
