@@ -288,7 +288,7 @@ function updateVisualTree() {
                      style="width:200px; height:200px; border-radius:6px; display:inline-block; object-fit:cover;" />
                 <div style="color:white; font-weight:bold; margin-top:8px; font-size:16px; font-family: sans-serif;">${d.data.name}</div>
                 <div class="node-note" style="color:#d0d0d0; font-size:12px; margin-top:6px; max-width:200px;">${d.data.note ? d.data.note : ''}</div>
-                ${d.data.id !== 0 ? `<button class="node-edge-note-btn" onclick="event.stopPropagation(); openEdgeNoteForNode(${d.data.id})">✎</button>` : ''}
+                ${d.data.id !== 0 ? `<div class="node-edge-note-text" onclick="event.stopPropagation(); openEdgeNoteForNode(${d.data.id})"></div>` : ''}
             </div>
         `);
     const nodeUpdate = nodeEnter.merge(nodes);

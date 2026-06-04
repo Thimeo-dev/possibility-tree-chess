@@ -433,22 +433,19 @@ h1 {
 
 /* Edge note modal tweaks if needed */
 
-.node-edge-note-btn {
-    margin-top: 10px;
-    padding: 6px 10px;
-    border: none;
-    border-radius: 999px;
-    background: var(--accent);
-    color: white;
+.node-edge-note-text {
+    margin-top: 8px;
+    color: var(--accent);
     font-size: 12px;
+    text-decoration: underline;
     cursor: pointer;
-    transition: transform 0.2s ease, filter 0.2s ease;
+    user-select: none;
 }
 
-.node-edge-note-btn:hover {
-    transform: translateY(-1px);
-    filter: brightness(1.1);
+.node-edge-note-text:hover {
+    opacity: 0.85;
 }
+
 #edge-note-modal .modal-card {
     width: min(520px, 92vw);
 }
