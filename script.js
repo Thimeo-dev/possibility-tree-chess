@@ -91,6 +91,7 @@ let currentUser = null; //  Pour suivre l'utilisateur connecté
 let isSignUpMode = false; //  Pour basculer entre Connexion et Inscription = {};
 let hideTreeBorder = localStorage.getItem('hideTreeBorder') === 'true';
 let hideTreeGlow = localStorage.getItem('hideTreeGlow') === 'true';
+let selectedEdgeTargetId = null;
 
 // Paramètres D3
 const margin = { top: 50, right: 150, bottom: 50, left: 150 };
@@ -212,6 +213,12 @@ function updateVisualTree() {
     
     links.enter().insert("path", "g") // Insérer avant les groupes de nœuds pour être "derrière"
         .attr("class", "link")
+        .attr("id", d => `link-${d.target.data.id}`)
+        .on('click', (e, d) => {
+            e.stopPropagation();
+            selectedEdgeTargetId = d.target.data.id;
+            updateVisualTree();
+        })
         .merge(links).transition().duration(400)
         .attr("d", d => {
             // Ajustement des points d'ancrage pour éviter l'effet coupé
@@ -219,8 +226,38 @@ function updateVisualTree() {
             const s = { x: d.source.y + 80, y: d.source.x };
             const t = { x: d.target.y - 80, y: d.target.x };
             return `M${s.x},${s.y}C${(s.x + t.x) / 2},${s.y} ${(s.x + t.x) / 2},${t.y} ${t.x},${t.y}`;
-        });
+        })
+        .style('stroke', d => selectedEdgeTargetId === d.target.data.id ? '#3498db' : '#444')
+        .style('stroke-width', d => selectedEdgeTargetId === d.target.data.id ? 5 : 3)
+        .style('opacity', 0.9);
     links.exit().remove();
+
+    // Link labels (text on branches)
+    const labels = g.selectAll('.link-label').data(root.links(), d => d.target.data.id);
+    labels.enter().append('text').attr('class', 'link-label')
+        .merge(labels)
+        .attr('text-anchor', 'middle')
+        .style('fill', '#d0d0d0')
+        .style('font-size', '12px')
+        .style('pointer-events', 'none')
+        .text(d => d.target.data.edgeNote || '')
+        .attr('x', d => {
+            const s = { x: d.source.y + 80, y: d.source.x };
+            const t = { x: d.target.y - 80, y: d.target.x };
+            return (s.x + t.x) / 2;
+        })
+        .attr('y', d => {
+            const s = { x: d.source.y + 80, y: d.source.x };
+            const t = { x: d.target.y - 80, y: d.target.x };
+            const dx = t.x - s.x;
+            const dy = t.y - s.y;
+            const L = Math.sqrt(dx * dx + dy * dy) || 1;
+            const nx = -dy / L;
+            const ny = dx / L;
+            const offset = 12;
+            return (s.y + t.y) / 2 + ny * offset;
+        });
+    labels.exit().remove();
 
     // Nœuds (Plateaux)
     const nodes = g.selectAll(".node").data(root.descendants(), d => d.data.id);
@@ -231,7 +268,7 @@ function updateVisualTree() {
         .on("click", (e, d) => jumpToPosition(d.data));
 
     nodeEnter.append("foreignObject")
-        .attr("width", 210).attr("height", 250).attr("x", -105).attr("y", -105)
+        .attr("width", 210).attr("height", 300).attr("x", -105).attr("y", -110)
         .append("xhtml:div").html(d => `
             <div style="text-align:center; cursor:pointer;">
                 <img id="image-${d.data.id}"
@@ -240,6 +277,7 @@ function updateVisualTree() {
                      alt="Plateau ${d.data.name}"
                      style="width:200px; height:200px; border-radius:6px; display:inline-block; object-fit:cover;" />
                 <div style="color:white; font-weight:bold; margin-top:8px; font-size:16px; font-family: sans-serif;">${d.data.name}</div>
+                <div class="node-note" style="color:#d0d0d0; font-size:12px; margin-top:6px; max-width:200px;">${d.data.note ? d.data.note : ''}</div>
             </div>
         `);
     const nodeUpdate = nodeEnter.merge(nodes);
@@ -255,6 +293,9 @@ function updateVisualTree() {
             if (hideTreeGlow) return "none";
             return d.data.id === currentNode.id ? "0 0 25px rgba(52, 152, 219, 0.7)" : "0 4px 10px rgba(0,0,0,0.5)";
         });
+
+    // Update note text for existing nodes
+    nodeUpdate.select('.node-note').text(d => d.data.note || '');
 
     setTimeout(() => {
         root.descendants().forEach(d => renderMiniBoardImage(`image-${d.data.id}`, d.data.fen));
@@ -282,6 +323,8 @@ function serializeTree(node) {
     return {
         id: node.id,
         name: node.name,
+        note: node.note || '',
+        edgeNote: node.edgeNote || '',
         fen: node.fen,
         children: node.children.map(child => serializeTree(child))
     };
@@ -291,6 +334,8 @@ function deserializeTree(node, parentNode = null) {
     let restoredNode = {
         id: node.id,
         name: node.name,
+        note: node.note || '',
+        edgeNote: node.edgeNote || '',
         fen: node.fen,
         children: [],
         parent: parentNode
@@ -695,7 +740,9 @@ function addMoveNode(move) {
             name: move.san,
             fen: game.fen(),
             children: [],
-            parent: currentNode
+            parent: currentNode,
+            note: '',
+            edgeNote: ''
         };
         currentNode.children.push(newNode);
         currentNode = newNode;
@@ -737,6 +784,11 @@ function jumpToPosition(node) {
     updateVisualTree();
     triggerAutoSave();
     triggerAutoSave();
+    // Populate note editor
+    try {
+        const ta = document.getElementById('node-note');
+        if (ta) ta.value = currentNode.note || '';
+    } catch (e) {}
 }
 
 function onDrop(source, target) {
@@ -852,6 +904,54 @@ $(document).ready(async function() {
 
     $('#save-local-btn').click(() => saveSnapshot('local'));
     $('#save-firebase-btn').click(() => saveSnapshot('firebase'));
+
+    // Floating add/edit edge note button
+    // Open edge-note modal when floating button clicked
+    $('#add-edge-note-btn').click(() => {
+        if (!selectedEdgeTargetId) return alert("Sélectionne d'abord une branche en cliquant sur une ligne de l'arbre.");
+        const targetNode = findNodeById(treeData, selectedEdgeTargetId);
+        if (!targetNode) return alert('Nœud introuvable');
+        const modal = document.getElementById('edge-note-modal');
+        const ta = document.getElementById('edge-note-text');
+        if (!modal || !ta) return;
+        ta.value = targetNode.edgeNote || '';
+        modal.style.display = 'flex';
+        ta.focus();
+    });
+
+    // Modal save/cancel handlers
+    $('#edge-note-save').click(() => {
+        if (!selectedEdgeTargetId) return;
+        const targetNode = findNodeById(treeData, selectedEdgeTargetId);
+        if (!targetNode) return;
+        const ta = document.getElementById('edge-note-text');
+        targetNode.edgeNote = ta ? ta.value : '';
+        document.getElementById('edge-note-modal').style.display = 'none';
+        updateVisualTree();
+        triggerAutoSave();
+    });
+    $('#edge-note-cancel').click(() => {
+        document.getElementById('edge-note-modal').style.display = 'none';
+    });
+
+    // Notes UI
+    $('#save-note-btn').click(() => {
+        const ta = document.getElementById('node-note');
+        if (!ta) return;
+        if (!currentNode) return alert('Aucun nœud sélectionné');
+        currentNode.note = ta.value;
+        updateVisualTree();
+        triggerAutoSave();
+    });
+    $('#clear-note-btn').click(() => {
+        const ta = document.getElementById('node-note');
+        if (!ta) return;
+        if (!currentNode) return;
+        ta.value = '';
+        currentNode.note = '';
+        updateVisualTree();
+        triggerAutoSave();
+    });
 
     // Ouverture / Fermeture modale
     const authModal = $('#auth-modal');

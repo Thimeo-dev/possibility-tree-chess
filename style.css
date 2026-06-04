@@ -407,9 +407,59 @@ h1 {
     overflow: visible;
 }
 
+.link-label {
+    pointer-events: none;
+    user-select: none;
+    dominant-baseline: middle;
+}
+
 /* Ensure images in nodes have no default shadow; JS controls glow */
 .node img {
     box-shadow: none !important;
+}
+
+.node-note {
+    color: #d0d0d0;
+    font-size: 12px;
+    margin-top: 6px;
+    max-width: 200px;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+}
+
+.floating-add {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font-size: 28px;
+    border: none;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    cursor: pointer;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.floating-add:hover { transform: scale(1.05); }
+
+/* Edge note modal tweaks if needed */
+#edge-note-modal .modal-card {
+    width: min(520px, 92vw);
+}
+
+.link-label {
+    pointer-events: none;
+    user-select: none;
 }
 
 .node canvas {
